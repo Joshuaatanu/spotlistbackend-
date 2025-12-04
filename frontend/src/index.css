@@ -1,0 +1,276 @@
+/* Apple HIG-inspired Design System */
+
+:root {
+  /* Color System - Light Theme (Ricofy.io inspired) */
+  --bg-primary: #F5F7FA;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F8F9FA;
+  --bg-card: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  
+  /* Text Colors */
+  --text-primary: #1A1A1A;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --text-quaternary: #D1D5DB;
+  
+  /* Accent Colors - Yellow Primary */
+  --accent-primary: #FCD34D; /* Bright Yellow */
+  --accent-primary-hover: #FBBF24;
+  --accent-success: #10B981;
+  --accent-warning: #F59E0B;
+  --accent-error: #EF4444;
+  --accent-purple: #8B5CF6;
+  --accent-text-on-primary: #1A1A1A;
+  
+  /* Borders and Dividers */
+  --border-color: #E5E7EB;
+  --border-subtle: #F3F4F6;
+  --border-strong: #D1D5DB;
+  
+  /* Spacing System (8px base unit) */
+  --space-xs: 4px;
+  --space-s: 8px;
+  --space-m: 16px;
+  --space-l: 24px;
+  --space-xl: 32px;
+  --space-xxl: 48px;
+  
+  /* Typography Scale */
+  --font-size-xs: 12px;
+  --font-size-sm: 14px;
+  --font-size-base: 16px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+/* Typography */
+h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+h2 {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+/* Container */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--space-xl);
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: var(--space-l);
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-m);
+  }
+}
+
+/* Card Component */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: var(--space-l);
+  transition: box-shadow var(--transition-base), transform var(--transition-base);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+/* Button Components */
+.btn {
+  background: var(--accent-primary);
+  color: var(--accent-text-on-primary);
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-s);
+  min-height: 40px;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--text-tertiary);
+}
+
+/* Form Inputs */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 12px 16px;
+  border-radius: 8px;
+  width: 100%;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  transition: border-color var(--transition-fast);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+}
+
+input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* Grid System */
+.grid {
+  display: grid;
+  gap: var(--space-l);
+}
+
+.grid-cols-1 { grid-template-columns: repeat(1, 1fr); }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+@media (max-width: 1024px) {
+  .grid-cols-4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
+}
+
+/* Utility Classes */
+.text-gradient {
+  color: var(--text-primary); /* Removed gradient for this style */
+}
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+
+/* Loading Spinner */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--text-primary);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-in { animation: fadeIn var(--transition-base); }
+
+/* Table Styles */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+thead {
+  border-bottom: 1px solid var(--border-color);
+}
+
+th {
+  text-align: left;
+  padding: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
