@@ -1,13 +1,14 @@
 import { useState, useMemo, useCallback } from 'react';
 import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3 } from 'lucide-react';
+import ExcelJS from 'exceljs';
 import MetricsCard from './MetricsCard';
 import { DoubleSpendChart, DoubleCountChart } from './Charts';
 import WindowTable from './WindowTable';
 import DoubleBookingsTable from './DoubleBookingsTable';
 import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from './AdditionalMetrics';
 import AdvancedFilters from './AdvancedFilters';
-import { DurationAnalysis } from './DurationAnalysis';
 import AIInsights from './AIInsights';
+import SpotEfficiencyOverview from './SpotEfficiencyOverview';
 
 export default function Dashboard({ data }) {
     const { metrics, window_summaries, data: rawData, field_map: fieldMap } = data;
@@ -129,30 +130,105 @@ export default function Dashboard({ data }) {
         return dataToUse.filter(r => r.is_double);
     }, [dataToUse]);
 
-    const downloadFilteredCSV = () => {
+    const downloadFilteredCSV = async () => {
         const dataToExport = filteredData || rawData;
         if (!dataToExport || !dataToExport.length) return;
-        const headers = Object.keys(dataToExport[0]);
-        const csvContent = [
-            headers.join(','),
-            ...dataToExport.map(row => headers.map(fieldName => {
-                let val = row[fieldName];
-                if (val === null || val === undefined) val = '';
-                val = String(val).replace(/"/g, '""'); // Escape quotes
-                if (val.includes(',') || val.includes('"') || val.includes('\n')) val = `"${val}"`;
-                return val;
-            }).join(','))
-        ].join('\n');
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        // Create a new workbook and worksheet
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Spotlist Data');
+
+        // Get headers from the first row
+        const headers = Object.keys(dataToExport[0]);
+        
+        // Add header row with styling
+        const headerRow = worksheet.addRow(headers);
+        headerRow.font = { bold: true, size: 11 };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFE5E7EB' } // Light gray background
+        };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.height = 20;
+
+        // Style header cells
+        headerRow.eachCell((cell, colNumber) => {
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+        });
+
+        // Add data rows with conditional highlighting for double bookings
+        dataToExport.forEach((row) => {
+            const rowData = headers.map(header => {
+                let val = row[header];
+                if (val === null || val === undefined) return '';
+                return val;
+            });
+            
+            const excelRow = worksheet.addRow(rowData);
+            
+            // Check if this row is a double booking
+            const isDouble = row.is_double === true || row.is_double === 'true' || row.is_double === 1;
+            
+            if (isDouble) {
+                // Highlight double booking rows with light red background
+                excelRow.fill = {
+                    type: 'pattern',
+                    pattern: 'solid',
+                    fgColor: { argb: 'FFFFE5E5' } // Light red/pink background
+                };
+                excelRow.font = { color: { argb: 'FF991B1B' } }; // Dark red text
+            }
+
+            // Add borders to all cells
+            excelRow.eachCell((cell) => {
+                cell.border = {
+                    top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                    right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+                };
+                cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+            });
+        });
+
+        // Auto-fit column widths
+        worksheet.columns.forEach((column) => {
+            let maxLength = 10;
+            column.eachCell({ includeEmpty: false }, (cell) => {
+                const cellValue = cell.value ? cell.value.toString() : '';
+                if (cellValue.length > maxLength) {
+                    maxLength = cellValue.length;
+                }
+            });
+            column.width = Math.min(maxLength + 2, 50); // Cap at 50 characters
+        });
+
+        // Freeze the header row
+        worksheet.views = [
+            { state: 'frozen', ySplit: 1 }
+        ];
+
+        // Generate Excel file
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
         const filterSuffix = filters ? '_filtered' : '';
-        link.setAttribute('download', `spotlist_annotated${filterSuffix}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', `spotlist_annotated${filterSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     };
 
     // Check if additional metrics are available
@@ -163,6 +239,9 @@ export default function Dashboard({ data }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* AI Insights */}
             <AIInsights metrics={metrics} />
+
+            {/* Spot Efficiency Overview */}
+            <SpotEfficiencyOverview metrics={metrics} data={dataToUse} />
 
             {/* Summary Metrics */}
             <div className="grid grid-cols-4" style={{ gap: '24px' }}>
@@ -247,9 +326,9 @@ export default function Dashboard({ data }) {
             {/* Charts */}
             <div className="grid grid-cols-2" style={{ gap: '32px' }}>
                 <div className="card">
-                    <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: 700 }}>
+                    <h3 style={{ marginBottom: '24px' }}>
                         Spend by Channel
-                        {filteredData && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text-secondary)' }}> (Filtered)</span>}
+                        {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}> (Filtered)</span>}
                     </h3>
                     <DoubleSpendChart
                         data={doubleBookings}
@@ -259,11 +338,11 @@ export default function Dashboard({ data }) {
                 </div>
                 <div className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0 }}>
+                        <h3 style={{ margin: 0 }}>
                             Trend Activity
-                            {filteredData && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text-secondary)' }}> (Filtered)</span>}
+                            {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}> (Filtered)</span>}
                         </h3>
-                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-semibold)' }}>
                             Last 30 Days
                         </div>
                     </div>
@@ -278,26 +357,13 @@ export default function Dashboard({ data }) {
                 onFilterChange={applyFilters}
             />
 
-            {/* Duration Analysis */}
-            {fieldMap?.duration_column && (
-                <div className="card">
-                    <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: 700 }}>
-                        Duration Analysis {filteredData && `(${filteredData.length} spots)`}
-                    </h3>
-                    <DurationAnalysis
-                        data={filteredData || rawData}
-                        durationField={fieldMap.duration_column}
-                        costField={fieldMap.cost_column}
-                    />
-                </div>
-            )}
 
             {/* Additional Analysis Charts */}
             {(fieldMap?.daypart_column || fieldMap?.epg_category_column) && (
                 <div className="grid grid-cols-2" style={{ gap: '32px' }}>
                     {fieldMap?.daypart_column && (
                         <div className="card">
-                            <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: 700 }}>
+                            <h3 style={{ marginBottom: '24px' }}>
                                 Performance by Daypart
                             </h3>
                             <DaypartAnalysis
@@ -311,7 +377,7 @@ export default function Dashboard({ data }) {
                     )}
                     {fieldMap?.epg_category_column && (
                         <div className="card">
-                            <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: 700 }}>
+                            <h3 style={{ marginBottom: '24px' }}>
                                 Spend by EPG Category
                             </h3>
                             <EPGCategoryBreakdown
@@ -327,9 +393,9 @@ export default function Dashboard({ data }) {
             {/* Channel Performance */}
             {fieldMap?.program_column && (
                 <div className="card">
-                    <h3 style={{ marginBottom: '24px', fontSize: '18px', fontWeight: 700 }}>
+                    <h3 style={{ marginBottom: '24px' }}>
                         Channel Performance & Efficiency
-                        {filteredData && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text-secondary)' }}> (Filtered)</span>}
+                        {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}> (Filtered)</span>}
                     </h3>
                     <ChannelPerformance
                         data={filteredData || rawData}
@@ -345,7 +411,7 @@ export default function Dashboard({ data }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, marginBottom: '4px' }}>
+                        <h3 style={{ margin: 0, marginBottom: '4px' }}>
                             Double Bookings by Time Window (All)
                         </h3>
                     </div>
@@ -354,8 +420,8 @@ export default function Dashboard({ data }) {
 
                 <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                     <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, margin: 0, marginBottom: '4px' }}>
-                            Detailed Double Bookings {filteredData && <span style={{ fontSize: '14px', fontWeight: 400, color: 'var(--text-secondary)' }}>({doubleBookings.length} of {rawData.filter(r => r.is_double).length})</span>}
+                        <h3 style={{ margin: 0, marginBottom: '4px' }}>
+                            Detailed Double Bookings {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}>({doubleBookings.length} of {rawData.filter(r => r.is_double).length})</span>}
                         </h3>
                         <p style={{ 
                             fontSize: '14px', 
@@ -374,7 +440,7 @@ export default function Dashboard({ data }) {
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <button onClick={downloadFilteredCSV} className="btn">
                     <Download size={20} />
-                    {filters ? 'Export Filtered CSV' : 'Download Annotated CSV'}
+                    {filters ? 'Export Filtered Excel' : 'Download Annotated Excel'}
                 </button>
             </div>
         </div>

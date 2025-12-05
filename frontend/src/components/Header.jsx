@@ -30,10 +30,13 @@ export default function Header() {
                         width: '100%',
                         padding: '10px 16px 10px 44px',
                         borderRadius: '20px',
-                        border: '1px solid var(--border-color)',
+                        border: '1.5px solid var(--border-color)',
                         backgroundColor: 'var(--bg-primary)',
-                        fontSize: '14px',
-                        color: 'var(--text-primary)'
+                        fontSize: 'var(--font-size-sm)',
+                        fontWeight: 'var(--font-weight-normal)',
+                        color: 'var(--text-primary)',
+                        letterSpacing: '-0.01em',
+                        transition: 'border-color var(--transition-fast), box-shadow var(--transition-fast)'
                     }}
                 />
             </div>
@@ -54,14 +57,32 @@ export default function Header() {
                     }} />
                 </div>
                 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    fontSize: 'var(--font-size-sm)', 
+                    fontWeight: 'var(--font-weight-semibold)', 
+                    color: 'var(--text-primary)', 
+                    cursor: 'pointer',
+                    letterSpacing: '-0.01em'
+                }}>
                     EN <ChevronDown size={16} />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                     <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)' }}>Daniel Craig</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>Super Admin</div>
+                        <div style={{ 
+                            fontSize: 'var(--font-size-sm)', 
+                            fontWeight: 'var(--font-weight-semibold)', 
+                            color: 'var(--text-primary)',
+                            letterSpacing: '-0.01em'
+                        }}>Daniel Craig</div>
+                        <div style={{ 
+                            fontSize: 'var(--font-size-xs)', 
+                            color: 'var(--text-tertiary)',
+                            fontWeight: 'var(--font-weight-normal)'
+                        }}>Super Admin</div>
                     </div>
                     <div style={{
                         width: '40px',
@@ -72,8 +93,10 @@ export default function Header() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '14px'
+                        fontWeight: 'var(--font-weight-bold)',
+                        fontSize: 'var(--font-size-sm)',
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        letterSpacing: '-0.01em'
                     }}>
                         DC
                     </div>

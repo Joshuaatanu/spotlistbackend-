@@ -157,7 +157,7 @@ export default function FileUpload({ file, setFile }) {
                 }}>
                     <Upload size={32} style={{ color: 'var(--accent-primary)' }} />
                 </div>
-                <h3 style={{
+                <h3 className="font-display" style={{
                     fontSize: 'var(--font-size-lg)',
                     fontWeight: 600,
                     color: 'var(--text-primary)',

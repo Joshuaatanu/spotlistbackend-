@@ -41,12 +41,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         }}>
             {/* Logo */}
             <div style={{ 
-                fontSize: '24px', 
-                fontWeight: '800', 
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: 'var(--font-size-xl)', 
+                fontWeight: 'var(--font-weight-extrabold)', 
                 marginBottom: 'var(--space-xxl)',
                 paddingLeft: '12px',
                 color: 'var(--text-primary)',
-                letterSpacing: '-0.5px'
+                letterSpacing: '-0.03em',
+                lineHeight: 'var(--line-height-tight)'
             }}>
                 Spot Analysis
             </div>
@@ -56,13 +58,13 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                 {menuItems.map((section, idx) => (
                     <div key={idx}>
                         <div style={{ 
-                            fontSize: '12px', 
-                            fontWeight: '600', 
+                            fontSize: 'var(--font-size-xs)', 
+                            fontWeight: 'var(--font-weight-semibold)', 
                             color: 'var(--text-tertiary)', 
                             marginBottom: '16px',
                             paddingLeft: '12px',
                             textTransform: 'uppercase',
-                            letterSpacing: '0.5px'
+                            letterSpacing: '0.05em'
                         }}>
                             {section.category}
                         </div>
@@ -84,7 +86,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                                             borderRadius: '10px',
                                             cursor: 'pointer',
                                             color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                            fontWeight: isActive ? 600 : 500,
+                                            fontWeight: isActive ? 'var(--font-weight-semibold)' : 'var(--font-weight-medium)',
+                                            fontSize: 'var(--font-size-sm)',
+                                            letterSpacing: '-0.01em',
                                             transition: 'all 0.2s',
                                             width: '100%',
                                             position: 'relative'

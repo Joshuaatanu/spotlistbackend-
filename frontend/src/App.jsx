@@ -74,18 +74,12 @@ function App() {
           {/* Page Header (Breadcrumbs like) */}
           <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <h2 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)' }}>
+              <h2>
                 {activeTab === 'analyze' ? 'Overview' : 
                  activeTab === 'results' ? 'Analysis Results' : 
                  activeTab === 'history' ? 'Payment History' : 
                  activeTab === 'configuration' ? 'Settings' : activeTab}
               </h2>
-              <div style={{ display: 'flex', gap: '20px', marginTop: '12px', fontSize: '14px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                <span style={{ color: 'var(--text-primary)', borderBottom: '2px solid var(--text-primary)', paddingBottom: '4px' }}>Overview</span>
-                <span>Clients</span>
-                <span>Account</span>
-                <span>Payments</span>
-              </div>
             </div>
             {activeTab === 'analyze' && (
                 <div style={{ textDecoration: 'underline', fontWeight: 600, cursor: 'pointer' }}>Manage</div>
@@ -101,44 +95,14 @@ function App() {
                 gap: '32px'
               }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                  {/* Stats Row Mockup for Overview */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-                     <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <div style={{ 
-                            width: '48px', height: '48px', borderRadius: '50%', 
-                            backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '20px'
-                        }}>
-                            💰
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Available Balance</div>
-                            <div style={{ fontSize: '24px', fontWeight: 700 }}>$14,823.20</div>
-                        </div>
-                     </div>
-                     <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <div style={{ 
-                            width: '48px', height: '48px', borderRadius: '50%', 
-                            backgroundColor: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontSize: '20px'
-                        }}>
-                            🔥
-                        </div>
-                        <div>
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>Pending Balance</div>
-                            <div style={{ fontSize: '24px', fontWeight: 700 }}>$2,498.80</div>
-                        </div>
-                     </div>
-                  </div>
-
                   <section className="card">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)', marginBottom: 'var(--space-l)' }}>
                       <Upload size={20} style={{ color: 'var(--text-primary)' }} />
                       <h3>Upload Spotlist</h3>
-                    </div>
-                    <FileUpload file={file} setFile={setFile} />
+              </div>
+              <FileUpload file={file} setFile={setFile} />
 
-                    {error && (
+            {error && (
                       <div style={{
                         marginTop: 'var(--space-m)',
                         padding: 'var(--space-m)',
@@ -151,25 +115,25 @@ function App() {
                         color: '#991B1B'
                       }}>
                         <span>{error}</span>
-                      </div>
-                    )}
+              </div>
+            )}
                   </section>
-                </div>
+          </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   <section className="card">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)', marginBottom: 'var(--space-l)' }}>
                       <Settings size={20} style={{ color: 'var(--text-primary)' }} />
                       <h3>Configuration</h3>
-                    </div>
-                    <ConfigPanel config={config} setConfig={setConfig} />
+              </div>
+              <ConfigPanel config={config} setConfig={setConfig} />
 
-                    <button
-                      onClick={handleAnalyze}
-                      disabled={!file || loading}
+              <button
+                onClick={handleAnalyze}
+                disabled={!file || loading}
                       className="btn"
                       style={{ width: '100%', marginTop: 'var(--space-l)' }}
-                    >
+              >
                       {loading ? (
                         <>
                           <div className="loading-spinner" />
@@ -178,19 +142,19 @@ function App() {
                       ) : (
                         'Run Analysis'
                       )}
-                    </button>
-                  </section>
-                </div>
-              </div>
+              </button>
+            </section>
+          </div>
+        </div>
             </div>
           )}
 
           {/* Results Tab */}
           {activeTab === 'results' && results && (
             <div className="animate-in">
-              <Dashboard data={results} />
-            </div>
-          )}
+            <Dashboard data={results} />
+          </div>
+        )}
 
           {/* History Tab */}
           {activeTab === 'history' && (
@@ -257,7 +221,7 @@ function App() {
               </div>
             </div>
           )}
-        </main>
+      </main>
       </div>
     </div>
   );

@@ -30,26 +30,29 @@ export default function MetricsCard({ title, value, subValue, icon: Icon, trend,
             
             <div style={{ flex: 1 }}>
                 <div style={{
-                    fontSize: '14px',
-                    fontWeight: 600,
+                    fontSize: 'var(--font-size-sm)',
+                    fontWeight: 'var(--font-weight-semibold)',
                     color: 'var(--text-secondary)',
-                    marginBottom: '4px'
+                    marginBottom: '6px',
+                    letterSpacing: '-0.01em'
                 }}>
                     {title}
                 </div>
                 <div style={{
-                    fontSize: '24px',
-                    fontWeight: 700,
+                    fontSize: 'var(--font-size-2xl)',
+                    fontWeight: 'var(--font-weight-bold)',
                     color: 'var(--text-primary)',
-                    lineHeight: 1.2
+                    lineHeight: 'var(--line-height-tight)',
+                    letterSpacing: '-0.02em',
+                    fontVariantNumeric: 'tabular-nums'
                 }}>
                     {value}
                 </div>
                 {subValue && (
                     <div style={{
-                        fontSize: '12px',
+                        fontSize: 'var(--font-size-xs)',
                         color: isCritical ? 'var(--accent-error)' : 'var(--text-tertiary)',
-                        marginTop: '4px',
+                        marginTop: '6px',
                         display: 'flex',
                         alignItems: 'center',
                         gap: '4px'
@@ -57,12 +60,13 @@ export default function MetricsCard({ title, value, subValue, icon: Icon, trend,
                         <span style={{ 
                             backgroundColor: isCritical ? '#FEF2F2' : '#ECFDF5',
                             color: isCritical ? '#DC2626' : '#059669',
-                            padding: '2px 6px',
-                            borderRadius: '10px',
-                            fontWeight: 600
+                            padding: '3px 8px',
+                            borderRadius: '6px',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            letterSpacing: '-0.01em'
                         }}>
                             {subValue}
-                        </span>
+                    </span>
                     </div>
                 )}
             </div>
