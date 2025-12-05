@@ -412,3 +412,15 @@ Column mapping: {'program': 'Channel', 'date': 'Airing date', 'time': 'Airing ti
 INFO:     127.0.0.1:52280 - "POST /analyze HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52420 - "OPTIONS /generate-insights HTTP/1.1" 200 OK
 INFO:     127.0.0.1:52420 - "POST /generate-insights HTTP/1.1" 200 OK
+Analyzing file: spotlist_check - daten.csv, window: 120
+German format detected. Final column mapping: {'program': 'Medium', 'date': 'Datum', 'time': 'Uhr', 'cost': 'Kosten ctc.', 'sendung_medium': 'Motiv', 'sendung_long': 'Titel vor'}
+Available columns in dataframe: ['Kunde', 'Produkt', 'Kamp', 'Verm.', 'Medium', 'Datum', 'Uhr', 'ZSI', 'Spl', 'Motiv', 'Kosten ctc.', 'Titel vor', 'Titel nach', 'GRP', 'SKZ Ag3', 'Unnamed: 15', 'Unnamed: 16']
+Detected format: german
+Column mapping: {'program': 'Medium', 'date': 'Datum', 'time': 'Uhr', 'cost': 'Kosten ctc.', 'sendung_medium': 'Motiv', 'sendung_long': 'Titel vor'}
+INFO:     127.0.0.1:60563 - "POST /analyze HTTP/1.1" 200 OK
+Analyzing file: spotlist_check - daten.csv, window: 120
+German format detected. Final column mapping: {'program': 'Medium', 'date': 'Datum', 'time': 'Uhr', 'cost': 'Kosten ctc.', 'sendung_medium': 'Motiv', 'sendung_long': 'Titel vor'}
+Available columns in dataframe: ['Kunde', 'Produkt', 'Kamp', 'Verm.', 'Medium', 'Datum', 'Uhr', 'ZSI', 'Spl', 'Motiv', 'Kosten ctc.', 'Titel vor', 'Titel nach', 'GRP', 'SKZ Ag3', 'Unnamed: 15', 'Unnamed: 16']
+Detected format: german
+Column mapping: {'program': 'Medium', 'date': 'Datum', 'time': 'Uhr', 'cost': 'Kosten ctc.', 'sendung_medium': 'Motiv', 'sendung_long': 'Titel vor'}
+INFO:     127.0.0.1:60565 - "POST /analyze HTTP/1.1" 200 OK

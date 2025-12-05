@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Sparkles, Key, AlertCircle, X, CheckCircle2, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import axios from 'axios';
+import { API_BASE_URL } from '../config';
 
 export default function AIInsights({ metrics }) {
     const [apiKey, setApiKey] = useState(localStorage.getItem('openai_api_key') || '');
@@ -34,7 +35,7 @@ export default function AIInsights({ metrics }) {
         setInsights(null);
         
         try {
-            const response = await axios.post('http://localhost:8000/generate-insights', {
+            const response = await axios.post(`${API_BASE_URL}/generate-insights`, {
                 metrics: metrics,
                 apiKey: apiKey
             });

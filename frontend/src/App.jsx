@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Upload, FileText, Clock, Settings } from 'lucide-react';
 import axios from 'axios';
+import { API_BASE_URL } from './config';
 import FileUpload from './components/FileUpload';
 import ConfigPanel from './components/ConfigPanel';
 import Dashboard from './components/Dashboard';
@@ -33,7 +34,7 @@ function App() {
     });
 
     try {
-      const response = await axios.post('http://localhost:8000/analyze', formData, {
+      const response = await axios.post(`${API_BASE_URL}/analyze`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
