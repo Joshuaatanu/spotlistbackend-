@@ -57,15 +57,33 @@ def build_datetime_for_comparison(date_val, time_val) -> Optional[datetime]:
         time_val = time_val.strip()
 
     # Normalise date
-    try:
-        # Works fine for 'YYYY-MM-DD'
-        d = datetime.fromisoformat(str(date_val)).date()
-    except ValueError:
+    date_str = str(date_val).strip()
+    d = None
+    
+    # Try DD.MM.YYYY format first (German format)
+    if '.' in date_str:
+        parts = date_str.split('.')
+        if len(parts) == 3:
+            try:
+                day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
+                # Assume 4-digit year, or handle 2-digit year
+                if year < 100:
+                    year += 2000  # Convert 2-digit to 4-digit (e.g., 25 -> 2025)
+                d = datetime(year, month, day).date()
+            except (ValueError, IndexError):
+                pass
+    
+    # If DD.MM.YYYY parsing failed, try other formats
+    if d is None:
         try:
-            # Fallback to pandas parsing style
-            d = pd.to_datetime(str(date_val)).date()
-        except Exception:
-            return None
+            # Works fine for 'YYYY-MM-DD'
+            d = datetime.fromisoformat(date_str).date()
+        except ValueError:
+            try:
+                # Fallback to pandas parsing style
+                d = pd.to_datetime(date_str).date()
+            except Exception:
+                return None
 
     # Normalise time
     if isinstance(time_val, datetime):

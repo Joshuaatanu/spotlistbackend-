@@ -11,8 +11,8 @@ function App() {
   const [activeTab, setActiveTab] = useState('analyze');
   const [file, setFile] = useState(null);
   const [config, setConfig] = useState({
-    creative_match_mode: 2,
-    creative_match_text: 'buy',
+    creative_match_mode: 1,
+    creative_match_text: '',
     time_window_minutes: 60
   });
   const [loading, setLoading] = useState(false);
@@ -82,6 +82,9 @@ function App() {
               </h2>
             </div>
             {activeTab === 'analyze' && (
+                <div style={{ textDecoration: 'underline', fontWeight: 600, cursor: 'pointer' }}>Manage</div>
+            )}
+            {activeTab === 'results' && (
                 <div style={{ textDecoration: 'underline', fontWeight: 600, cursor: 'pointer' }}>Manage</div>
             )}
           </div>

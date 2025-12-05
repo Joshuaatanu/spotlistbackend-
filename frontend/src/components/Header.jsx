@@ -77,7 +77,7 @@ export default function Header() {
                             fontWeight: 'var(--font-weight-semibold)', 
                             color: 'var(--text-primary)',
                             letterSpacing: '-0.01em'
-                        }}>Daniel Craig</div>
+                        }}>joshua</div>
                         <div style={{ 
                             fontSize: 'var(--font-size-xs)', 
                             color: 'var(--text-tertiary)',

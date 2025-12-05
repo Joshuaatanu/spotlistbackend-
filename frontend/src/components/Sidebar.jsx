@@ -54,7 +54,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             </div>
 
             {/* Navigation */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', flex: 1 }}>
                 {menuItems.map((section, idx) => (
                     <div key={idx}>
                         <div style={{ 

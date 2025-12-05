@@ -6,3 +6,262 @@
   VITE v7.2.6  ready in 111 ms
 
   ➜  Local:   http://127.0.0.1:5173/
+11:27:06 AM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+11:27:07 AM [vite] (client) ✨ new dependencies optimized: react-markdown
+11:27:07 AM [vite] (client) ✨ optimized dependencies changed. reloading
+11:27:07 AM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+12:21:16 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:21:22 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:21:59 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+12:21:59 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+12:21:59 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:28:13 PM [vite] (client) hmr update /src/App.jsx
+4:28:13 PM [vite] (client) hmr update /src/index.css
+4:28:13 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/MetricsCard.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/FileUpload.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/ConfigPanel.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/WindowTable.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/DoubleBookingsTable.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/DurationAnalysis.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/Charts.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/AdditionalMetrics.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/Header.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/AIInsights.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+4:28:13 PM [vite] (client) hmr update /src/components/AdvancedFilters.jsx
+4:28:13 PM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+4:29:13 PM [vite] (client) page reload index.html
+4:29:18 PM [vite] (client) hmr update /src/index.css
+4:29:22 PM [vite] (client) hmr update /src/index.css
+4:29:32 PM [vite] (client) hmr update /src/index.css
+4:29:35 PM [vite] (client) hmr update /src/index.css
+4:29:41 PM [vite] (client) hmr update /src/index.css
+4:29:46 PM [vite] (client) hmr update /src/index.css
+4:29:48 PM [vite] (client) hmr update /src/index.css
+4:29:56 PM [vite] (client) hmr update /src/index.css
+4:30:08 PM [vite] (client) hmr update /src/components/Header.jsx
+4:30:12 PM [vite] (client) hmr update /src/components/Header.jsx
+4:30:15 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:30:18 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:30:20 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:30:35 PM [vite] (client) hmr update /src/components/MetricsCard.jsx
+4:30:48 PM [vite] (client) hmr update /src/index.css
+4:30:54 PM [vite] (client) hmr update /src/index.css
+4:31:07 PM [vite] (client) hmr update /src/index.css
+4:31:07 PM [vite] (client) page reload index.html
+4:31:07 PM [vite] (client) hmr update /src/components/MetricsCard.jsx
+4:31:07 PM [vite] (client) hmr update /src/components/Header.jsx
+4:31:07 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:34:06 PM [vite] (client) page reload index.html
+4:34:12 PM [vite] (client) hmr update /src/index.css
+4:34:22 PM [vite] (client) hmr update /src/index.css
+4:34:33 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:34:35 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:34:49 PM [vite] (client) hmr update /src/index.css
+4:34:49 PM [vite] (client) hmr update /src/index.css
+4:34:53 PM [vite] (client) hmr update /src/index.css
+4:35:01 PM [vite] (client) hmr update /src/index.css
+4:35:06 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:08 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:09 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:09 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:11 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:14 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:16 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:19 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:35:21 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+4:35:22 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+4:35:22 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+4:35:24 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+4:35:24 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+4:35:27 PM [vite] (client) hmr update /src/components/AIInsights.jsx
+4:35:37 PM [vite] (client) hmr update /src/components/Header.jsx
+4:35:53 PM [vite] (client) hmr update /src/App.jsx
+4:36:01 PM [vite] (client) hmr update /src/components/FileUpload.jsx
+4:36:01 PM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+4:36:19 PM [vite] (client) page reload index.html
+4:36:19 PM [vite] (client) hmr update /src/index.css
+4:36:19 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+4:36:19 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+4:36:19 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+4:36:19 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+4:36:19 PM [vite] (client) hmr update /src/components/AIInsights.jsx
+4:36:19 PM [vite] (client) hmr update /src/components/FileUpload.jsx
+4:36:19 PM [vite] (client) hmr update /src/components/Header.jsx
+4:36:19 PM [vite] (client) hmr update /src/App.jsx
+4:36:19 PM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+5:28:51 PM [vite] (client) hmr update /src/App.jsx
+5:29:03 PM [vite] (client) hmr update /src/App.jsx
+5:29:55 PM [vite] (client) hmr update /src/App.jsx
+5:30:03 PM [vite] (client) hmr update /src/App.jsx
+5:41:57 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+5:41:59 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+5:42:07 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:18:59 AM [vite] (client) hmr update /src/components/AIInsights.jsx
+12:19:11 AM [vite] (client) hmr update /src/components/AIInsights.jsx
+12:20:32 AM [vite] (client) hmr update /src/components/AIInsights.jsx
+12:20:40 AM [vite] (client) hmr update /src/components/AIInsights.jsx
+12:20:46 AM [vite] (client) hmr update /src/components/AIInsights.jsx
+11:47:10 AM [vite] (client) hmr update /src/components/Dashboard.jsx
+11:47:25 AM [vite] (client) hmr update /src/components/Dashboard.jsx
+11:47:39 AM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:04:40 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:04:41 PM [vite] (client) ✨ new dependencies optimized: exceljs
+12:04:41 PM [vite] (client) ✨ optimized dependencies changed. reloading
+12:04:41 PM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+12:04:58 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:04:59 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:05:09 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:43:27 PM [vite] (client) hmr update /src/components/Header.jsx
+12:45:03 PM [vite] (client) hmr update /src/components/ConfigPanel.jsx
+12:45:05 PM [vite] (client) hmr update /src/App.jsx
+12:45:19 PM [vite] (client) hmr update /src/components/ConfigPanel.jsx
+12:45:19 PM [vite] (client) hmr update /src/App.jsx
+12:49:18 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:49:37 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+12:57:19 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+12:57:34 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+12:58:53 PM [vite] (client) hmr update /src/App.jsx
+12:59:07 PM [vite] (client) hmr update /src/App.jsx
+1:07:36 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:07:49 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:12:54 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:12:57 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/Header.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/MetricsCard.jsx
+1:13:21 PM [vite] (client) hmr update /src/index.css
+1:13:21 PM [vite] (client) hmr update /src/components/ConfigPanel.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/WindowTable.jsx
+1:13:21 PM [vite] (client) hmr update /src/App.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/DoubleBookingsTable.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/Charts.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/AdditionalMetrics.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/DurationAnalysis.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/AdvancedFilters.jsx
+1:13:21 PM [vite] (client) page reload index.html
+1:13:21 PM [vite] (client) hmr update /src/components/AIInsights.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/FileUpload.jsx
+1:13:21 PM [vite] (client) hmr update /src/index.css
+1:13:21 PM [vite] (client) hmr update /src/components/ConfigPanel.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/WindowTable.jsx
+1:13:21 PM [vite] (client) hmr update /src/App.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/DoubleBookingsTable.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/Charts.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/AdditionalMetrics.jsx
+1:13:21 PM [vite] (client) hmr update /src/components/DurationAnalysis.jsx
+1:13:21 PM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+1:13:47 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:13:49 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:13:58 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:14:21 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:14:32 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:14:50 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:15:00 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/Header.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/MetricsCard.jsx
+1:20:04 PM [vite] (client) hmr update /src/App.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/DoubleBookingsTable.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/FileUpload.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/Charts.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/DurationAnalysis.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/AdditionalMetrics.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/AdvancedFilters.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/ConfigPanel.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/SpotEfficiencyOverview.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/AIInsights.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/WindowTable.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/MetricsCard.jsx
+1:20:04 PM [vite] (client) hmr update /src/App.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/DoubleBookingsTable.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/FileUpload.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/Charts.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/Sidebar.jsx
+1:20:04 PM [vite] (client) hmr update /src/components/FairShareAnalysis.jsx
+1:20:04 PM [vite] (client) page reload index.html
+1:20:04 PM [vite] (client) hmr update /src/index.css
+1:20:04 PM [vite] (client) warning: Duplicate key "marginBottom" in object literal
+164 |            marginBottom: 'var(--space-s)',
+165 |            margin: 0,
+166 |            marginBottom: 'var(--space-s)'
+    |            ^
+167 |          }}>
+168 |                      Drop your spotlist here
+
+  Plugin: vite:esbuild
+  File: /Users/user/dev/work/spotlistchecker/frontend/src/components/FileUpload.jsx
+1:22:18 PM [vite] (client) hmr update /src/components/Header.jsx
+1:23:14 PM [vite] (client) hmr update /src/components/Dashboard.jsx
+1:23:21 PM [vite] (client) hmr update /src/components/Dashboard.jsx

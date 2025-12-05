@@ -14,6 +14,19 @@ export default function Dashboard({ data }) {
     const { metrics, window_summaries, data: rawData, field_map: fieldMap } = data;
     const [filters, setFilters] = useState(null);
     const [filteredData, setFilteredData] = useState(null);
+    
+    // Use 120-minute window metrics by default (matching personal analysis)
+    const displayMetrics = useMemo(() => {
+        if (window_summaries && window_summaries.length > 0) {
+            // Find 120-minute window summary
+            const window120 = window_summaries.find(w => w.window_minutes === 120);
+            if (window120 && window120.all) {
+                return window120.all;
+            }
+        }
+        // Fallback to default metrics if 120-minute not found
+        return metrics;
+    }, [window_summaries, metrics]);
 
     // Prepare data for table (memoized)
     const allTable = useMemo(() => {
@@ -232,8 +245,8 @@ export default function Dashboard({ data }) {
     };
 
     // Check if additional metrics are available
-    const hasXRP = metrics.total_xrp !== undefined;
-    const hasReach = metrics.total_reach !== undefined;
+    const hasXRP = displayMetrics.total_xrp !== undefined;
+    const hasReach = displayMetrics.total_reach !== undefined;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -241,34 +254,156 @@ export default function Dashboard({ data }) {
             <AIInsights metrics={metrics} />
 
             {/* Spot Efficiency Overview */}
-            <SpotEfficiencyOverview metrics={metrics} data={dataToUse} />
+            <SpotEfficiencyOverview metrics={displayMetrics} data={dataToUse} />
 
             {/* Summary Metrics */}
             <div className="grid grid-cols-4" style={{ gap: '24px' }}>
                 <MetricsCard
                     title="Total Spend"
-                    value={`€${metrics.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    value={`€${displayMetrics.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                     icon={DollarSign}
                 />
                 <MetricsCard
                     title="Double Booking Spend"
-                    value={`€${metrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    subValue={`${(metrics.percent_cost * 100).toFixed(1)}% of total`}
+                    value={`€${displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    subValue={`${(displayMetrics.percent_cost * 100).toFixed(2)}% of total`}
                     icon={AlertTriangle}
-                    isCritical={metrics.double_cost > 0}
+                    isCritical={displayMetrics.double_cost > 0}
                 />
                 <MetricsCard
                     title="Total Spots"
-                    value={metrics.total_spots.toLocaleString()}
+                    value={displayMetrics.total_spots.toLocaleString()}
                     icon={Layers}
                 />
                 <MetricsCard
                     title="Double Spots"
-                    value={metrics.double_spots.toLocaleString()}
-                    subValue={`${(metrics.percent_spots * 100).toFixed(1)}% of spots`}
+                    value={displayMetrics.double_spots.toLocaleString()}
+                    subValue={`${(displayMetrics.percent_spots * 100).toFixed(2)}% of spots`}
                     icon={Activity}
-                    isCritical={metrics.double_spots > 0}
+                    isCritical={displayMetrics.double_spots > 0}
                 />
+            </div>
+
+            {/* Duplicate Breakdown */}
+            <div className="card">
+                <h3 style={{ marginBottom: 'var(--space-l)' }}>
+                    Duplicate Booking Analysis
+                </h3>
+                <div style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+                    gap: 'var(--space-xl)' 
+                }}>
+                    {/* Cost of Duplicate Bookings */}
+                    <div>
+                        <div style={{
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color: 'var(--text-secondary)',
+                            marginBottom: 'var(--space-s)'
+                        }}>
+                            Cost of Duplicate Bookings
+                        </div>
+                        <div style={{
+                            fontSize: 'var(--font-size-2xl)',
+                            fontWeight: 'var(--font-weight-bold)',
+                            color: 'var(--accent-error)',
+                            marginBottom: 'var(--space-xs)'
+                        }}>
+                            €{displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </div>
+                    </div>
+
+                    {/* Percentage of Duplicate Bookings (% of costs) */}
+                    <div>
+                        <div style={{
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color: 'var(--text-secondary)',
+                            marginBottom: 'var(--space-s)'
+                        }}>
+                            Percentage of Duplicate Bookings
+                        </div>
+                        <div style={{
+                            fontSize: 'var(--font-size-2xl)',
+                            fontWeight: 'var(--font-weight-bold)',
+                            color: 'var(--accent-error)',
+                            marginBottom: 'var(--space-xs)'
+                        }}>
+                            {(displayMetrics.percent_cost * 100).toFixed(2)}%
+                        </div>
+                        <div style={{
+                            fontSize: 'var(--font-size-xs)',
+                            color: 'var(--text-tertiary)'
+                        }}>
+                            as % of costs
+                        </div>
+                    </div>
+
+                    {/* Total Number of Affected Spots */}
+                    <div>
+                        <div style={{
+                            fontSize: 'var(--font-size-sm)',
+                            fontWeight: 'var(--font-weight-semibold)',
+                            color: 'var(--text-secondary)',
+                            marginBottom: 'var(--space-s)'
+                        }}>
+                            Total Number of Affected Spots
+                        </div>
+                        <div style={{
+                            fontSize: 'var(--font-size-2xl)',
+                            fontWeight: 'var(--font-weight-bold)',
+                            color: 'var(--accent-error)',
+                            marginBottom: 'var(--space-xs)'
+                        }}>
+                            {displayMetrics.double_spots.toLocaleString()}
+                        </div>
+                    </div>
+
+                    {/* Same Programme Duplicates */}
+                    {displayMetrics.same_sendung_spots !== undefined && (
+                        <div>
+                            <div style={{
+                                fontSize: 'var(--font-size-sm)',
+                                fontWeight: 'var(--font-weight-semibold)',
+                                color: 'var(--text-secondary)',
+                                marginBottom: 'var(--space-s)'
+                            }}>
+                                Same Programme Duplicates
+                            </div>
+                            <div style={{
+                                fontSize: 'var(--font-size-2xl)',
+                                fontWeight: 'var(--font-weight-bold)',
+                                color: 'var(--accent-warning)',
+                                marginBottom: 'var(--space-xs)'
+                            }}>
+                                {displayMetrics.same_sendung_spots.toLocaleString()}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Different Programme Duplicates */}
+                    {displayMetrics.diff_sendung_spots !== undefined && (
+                        <div>
+                            <div style={{
+                                fontSize: 'var(--font-size-sm)',
+                                fontWeight: 'var(--font-weight-semibold)',
+                                color: 'var(--text-secondary)',
+                                marginBottom: 'var(--space-s)'
+                            }}>
+                                Different Programme Duplicates
+                            </div>
+                            <div style={{
+                                fontSize: 'var(--font-size-2xl)',
+                                fontWeight: 'var(--font-weight-bold)',
+                                color: 'var(--accent-error)',
+                                marginBottom: 'var(--space-xs)'
+                            }}>
+                                {displayMetrics.diff_sendung_spots.toLocaleString()}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Additional Metrics (if available) */}
@@ -278,15 +413,15 @@ export default function Dashboard({ data }) {
                         <>
                             <MetricsCard
                                 title="Total XRP Reach"
-                                value={metrics.total_xrp.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                value={displayMetrics.total_xrp.toLocaleString(undefined, { maximumFractionDigits: 1 })}
                                 icon={TrendingUp}
                             />
                             <MetricsCard
                                 title="Double Booking XRP"
-                                value={metrics.double_xrp.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                                subValue={`${(metrics.percent_xrp * 100).toFixed(1)}% of total`}
+                                value={displayMetrics.double_xrp.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                subValue={`${(displayMetrics.percent_xrp * 100).toFixed(1)}% of total`}
                                 icon={AlertTriangle}
-                                isCritical={metrics.double_xrp > 0}
+                                isCritical={displayMetrics.double_xrp > 0}
                             />
                         </>
                     )}
@@ -294,15 +429,15 @@ export default function Dashboard({ data }) {
                         <>
                             <MetricsCard
                                 title="Total Reach"
-                                value={metrics.total_reach.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                value={displayMetrics.total_reach.toLocaleString(undefined, { maximumFractionDigits: 1 })}
                                 icon={Users}
                             />
                             <MetricsCard
                                 title="Double Booking Reach"
-                                value={metrics.double_reach.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                                subValue={`${(metrics.percent_reach * 100).toFixed(1)}% of total`}
+                                value={displayMetrics.double_reach.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                                subValue={`${(displayMetrics.percent_reach * 100).toFixed(1)}% of total`}
                                 icon={AlertTriangle}
-                                isCritical={metrics.double_reach > 0}
+                                isCritical={displayMetrics.double_reach > 0}
                             />
                         </>
                     )}
@@ -324,18 +459,7 @@ export default function Dashboard({ data }) {
             )}
 
             {/* Charts */}
-            <div className="grid grid-cols-2" style={{ gap: '32px' }}>
-                <div className="card">
-                    <h3 style={{ marginBottom: '24px' }}>
-                        Spend by Channel
-                        {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}> (Filtered)</span>}
-                    </h3>
-                    <DoubleSpendChart
-                        data={doubleBookings}
-                        costField={fieldMap?.cost_column}
-                        programField={fieldMap?.program_column}
-                    />
-                </div>
+            <div className="grid grid-cols-1" style={{ gap: '32px' }}>
                 <div className="card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                         <h3 style={{ margin: 0 }}>
