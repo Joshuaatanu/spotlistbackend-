@@ -1,0 +1,1 @@
+# spotlist-checker
