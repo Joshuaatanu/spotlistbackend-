@@ -2,13 +2,17 @@ import io
 import sys
 from datetime import date, datetime, time
 from typing import Any, Optional
+from pathlib import Path
 
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
+import asyncio
+import json
+from typing import AsyncGenerator
 
 # Try importing openai, handle if missing
 try:
@@ -26,6 +30,25 @@ except ImportError:
         # Fallback if both fail, though this shouldn't happen if structure is correct
         print("Error: Could not import spotlist_checkerv2. Make sure you are running from the correct directory.")
         raise
+
+# Import AEOS integration modules
+try:
+    # Add integration folder to path so relative imports work
+    integration_path = Path(__file__).parent / "integration"
+    integration_path_str = str(integration_path.absolute())
+    if integration_path_str not in sys.path:
+        sys.path.insert(0, integration_path_str)
+    
+    # Import directly (they use relative imports within the integration folder)
+    from aeos_client import AEOSClient
+    from spotlist_checker import SpotlistChecker as AEOSSpotlistChecker
+    from utils import flatten_spotlist_report
+    AEOS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: AEOS integration not available: {e}")
+    import traceback
+    traceback.print_exc()
+    AEOS_AVAILABLE = False
 
 app = FastAPI(title="Spotlist Checker API")
 
@@ -466,6 +489,266 @@ async def analyze_spotlist(
     except Exception as e:
         print(f"Error serialization: {e}")
         raise HTTPException(status_code=500, detail=f"Error serializing response: {str(e)}")
+
+
+async def stream_progress_updates(
+    company_name: str,
+    date_from: str,
+    date_to: str,
+    creative_match_mode: int,
+    creative_match_text: str,
+    time_window_minutes: int,
+    channel_filter: Optional[str] = None,
+) -> AsyncGenerator[str, None]:
+    """Generator that yields progress updates as SSE events"""
+    
+    def send_progress(progress: float, message: str, stage: str = "info"):
+        """Helper to send progress update"""
+        data = {
+            "progress": progress,
+            "message": message,
+            "stage": stage
+        }
+        return f"data: {json.dumps(data)}\n\n"
+    
+    try:
+        yield send_progress(0, "Initializing AEOS client...", "info")
+        
+        if not AEOS_AVAILABLE:
+            yield send_progress(0, "AEOS integration not available", "error")
+            return
+        
+        # 1. Initialize AEOS client
+        await asyncio.sleep(0)  # Yield control
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        checker = AEOSSpotlistChecker(client)
+        
+        yield send_progress(5, "Fetching analytics channels...", "info")
+        await asyncio.sleep(0)
+        
+        # 2. Get analytics channels (filtered if specified)
+        all_channels_raw = await loop.run_in_executor(None, client.get_analytics_channels)
+        
+        # Filter by channel name(s) if specified (supports comma-separated list)
+        if channel_filter and channel_filter.strip():
+            # Split by comma and strip whitespace from each
+            filter_terms = [term.strip().lower() for term in channel_filter.split(',') if term.strip()]
+            
+            if filter_terms:
+                all_channels = []
+                matched_channels = []
+                
+                # Find channels matching any of the filter terms
+                for ch in all_channels_raw:
+                    channel_name_lower = ch.get("caption", "").lower()
+                    # Check if any filter term matches this channel
+                    for term in filter_terms:
+                        if term in channel_name_lower:
+                            all_channels.append(ch)
+                            matched_channels.append(ch.get("caption", ""))
+                            break  # Only add each channel once
+                
+                if not all_channels:
+                    yield send_progress(10, f"None of the specified channels found: {channel_filter}. Available channels will be searched.", "warning")
+                    all_channels = all_channels_raw
+                else:
+                    # Remove duplicates while preserving order
+                    seen = set()
+                    unique_channels = []
+                    unique_names = []
+                    for ch in all_channels:
+                        ch_name = ch.get("caption", "")
+                        if ch_name not in seen:
+                            seen.add(ch_name)
+                            unique_channels.append(ch)
+                            unique_names.append(ch_name)
+                    
+                    all_channels = unique_channels
+                    if len(all_channels) == 1:
+                        yield send_progress(10, f"Filtering to channel: {unique_names[0]}", "info")
+                    else:
+                        display_names = unique_names[:5]  # Show up to 5 names
+                        more_text = f" and {len(unique_names) - 5} more" if len(unique_names) > 5 else ""
+                        yield send_progress(10, f"Filtering to {len(all_channels)} channels: {', '.join(display_names)}{more_text}", "info")
+            else:
+                all_channels = all_channels_raw
+        else:
+            all_channels = all_channels_raw
+        
+        total_channels = len(all_channels)
+        yield send_progress(10, f"Searching {total_channels} channel(s)", "info")
+        
+        # 3. Fetch spotlists for each channel and filter by company
+        all_rows = []
+        target = company_name.lower()
+        channels_processed = 0
+        channels_with_data = 0
+        
+        for idx, ch in enumerate(all_channels):
+            channel_id = ch["value"]
+            channel_caption = ch["caption"]
+            channels_processed += 1
+            
+            # Progress based on channels processed (10% to 70%)
+            progress = 10 + (idx / total_channels) * 60
+            yield send_progress(
+                int(progress),
+                f"Processing channel {channels_processed}/{total_channels}: {channel_caption}...",
+                "info"
+            )
+            
+            try:
+                await asyncio.sleep(0)  # Yield control to event loop
+                yield send_progress(
+                    int(progress),
+                    f"Requesting report for {channel_caption}...",
+                    "info"
+                )
+                
+                # Run blocking operation in thread pool
+                loop = asyncio.get_event_loop()
+                report = await loop.run_in_executor(
+                    None,
+                    checker.get_spotlist,
+                    channel_id,
+                    date_from,
+                    date_to,
+                )
+                
+                yield send_progress(
+                    int(progress + 2),
+                    f"Processing data from {channel_caption}...",
+                    "info"
+                )
+                
+                rows = flatten_spotlist_report(report)
+                
+                if not rows:
+                    continue
+                
+                # Filter by company name
+                channel_matches = 0
+                for r in rows:
+                    company = str(r.get("Company") or r.get("Kunde") or "").lower()
+                    if target in company:
+                        r["Channel"] = channel_caption
+                        all_rows.append(r)
+                        channel_matches += 1
+                
+                if channel_matches > 0:
+                    channels_with_data += 1
+                    yield send_progress(
+                        int(progress + 5),
+                        f"✓ Found {channel_matches} spots on {channel_caption}",
+                        "success"
+                    )
+                        
+            except Exception as e:
+                yield send_progress(
+                    int(progress),
+                    f"⚠ Skipped {channel_caption}: {str(e)[:50]}",
+                    "warning"
+                )
+                continue
+        
+        yield send_progress(70, f"Found {len(all_rows)} total spots from {channels_with_data} channels", "success")
+        
+        if not all_rows:
+            yield send_progress(
+                70,
+                f"No ads found for company '{company_name}' in date range",
+                "error"
+            )
+            return
+        
+        yield send_progress(75, "Converting to DataFrame...", "info")
+        
+        # 4. Convert to DataFrame
+        df = pd.DataFrame(all_rows)
+        
+        if "Channel" not in df.columns and "Medium" in df.columns:
+            df["Channel"] = df["Medium"]
+        
+        yield send_progress(80, "Detecting data format...", "info")
+        
+        # 5. Detect data format
+        format_info = detect_data_format(df)
+        detected_column_map = format_info['column_map']
+        detected_format = format_info['format']
+        
+        yield send_progress(85, f"Detected format: {detected_format}", "info")
+        
+        # Get program column for metadata (needed for raw data return)
+        detected_program_col = detected_column_map.get('program', None)
+        if not detected_program_col:
+            # Try to find any channel-like column
+            for col in df.columns:
+                col_lower = str(col).strip().lower()
+                if col_lower in ['channel', 'medium', 'sender', 'kanal']:
+                    detected_program_col = col
+                    break
+        
+        # Return raw collected data - user can choose to download or analyze
+        yield send_progress(100, "Data collection complete! Preparing raw data...", "success")
+        
+        raw_data_result = {
+            "raw_data": dataframe_to_records(df),
+            "metadata": {
+                "company_name": company_name,
+                "date_from": date_from,
+                "date_to": date_to,
+                "channel_filter": channel_filter if channel_filter else None,
+                "total_spots": len(df),
+                "channels_found": list(df[detected_program_col].unique().astype(str)) if detected_program_col and detected_program_col in df.columns else [],
+                "format_detected": detected_format,
+                "column_map": detected_column_map,
+            }
+        }
+        yield f"data: {json.dumps({'progress': 100, 'message': 'collection_complete', 'raw_data': json_safe(raw_data_result)})}\n\n"
+        return  # Exit - raw data sent, analysis will be done separately if user chooses
+        
+    except Exception as e:
+        yield send_progress(0, f"Error: {str(e)}", "error")
+        import traceback
+        traceback.print_exc()
+
+
+@app.post("/analyze-from-aeos")
+async def analyze_from_aeos(
+    company_name: str = Form(...),
+    date_from: str = Form(...),
+    date_to: str = Form(...),
+    creative_match_mode: int = Form(1),
+    creative_match_text: str = Form(""),
+    time_window_minutes: int = Form(60),
+    channel_filter: str = Form(""),
+):
+    """
+    Fetch spotlist data from AEOS API by company name and date range,
+    then analyze it using the same pipeline as file uploads.
+    Streams progress updates via Server-Sent Events (SSE).
+    
+    channel_filter: Optional channel name to filter by (e.g., "VOX"). 
+                   If empty, searches all channels.
+    """
+    return StreamingResponse(
+        stream_progress_updates(
+            company_name=company_name,
+            date_from=date_from,
+            date_to=date_to,
+            creative_match_mode=creative_match_mode,
+            creative_match_text=creative_match_text,
+            time_window_minutes=time_window_minutes,
+            channel_filter=channel_filter if channel_filter else None,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 class InsightRequest(BaseModel):
