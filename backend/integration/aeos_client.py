@@ -5,8 +5,16 @@ from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv()
+# Try to load .env file relative to this script's directory
+# But don't fail if it doesn't exist (e.g., on Render where env vars are set in dashboard)
+env_path = Path(__file__).parent / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    # Fallback: try current directory or parent directories
+    load_dotenv()
 
 BASE_URL = "https://api.adscanner.tv"
 API_KEY = os.getenv("AEOS_API_KEY")
@@ -41,9 +49,15 @@ def _patch_socket_for_ipv4():
 class AEOSClient:
     """Client for AEOS API v4."""
     def __init__(self, api_key: str | None = None, force_ipv4: bool = True):
-        self.api_key = api_key or API_KEY
+        # Try passed API key, then module-level API_KEY, then environment variable directly
+        self.api_key = api_key or API_KEY or os.getenv("AEOS_API_KEY")
         if not self.api_key:
-            raise ValueError("AEOS_API_KEY is missing in environment variables.")
+            # Debug: check what env vars are available
+            env_vars_with_aeos = [k for k in os.environ.keys() if 'AEOS' in k.upper()]
+            raise ValueError(
+                f"AEOS_API_KEY is missing in environment variables. "
+                f"Available AEOS-related env vars: {env_vars_with_aeos}"
+            )
         self.token = None
         self.token_expires_at = None  # Track token expiration time
         self.channels_cache = None

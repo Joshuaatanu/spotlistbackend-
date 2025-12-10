@@ -521,8 +521,21 @@ async def stream_progress_updates(
         # 1. Initialize AEOS client
         await asyncio.sleep(0)  # Yield control
         loop = asyncio.get_event_loop()
-        client = await loop.run_in_executor(None, AEOSClient)
-        checker = AEOSSpotlistChecker(client)
+        try:
+            client = await loop.run_in_executor(None, AEOSClient)
+            checker = AEOSSpotlistChecker(client)
+        except ValueError as e:
+            # Catch API key missing errors and provide helpful message
+            if "AEOS_API_KEY" in str(e):
+                yield send_progress(0, "AEOS API key not found. Please ensure AEOS_API_KEY is set in environment variables.", "error")
+            else:
+                yield send_progress(0, f"Error initializing AEOS client: {str(e)}", "error")
+            return
+        except Exception as e:
+            yield send_progress(0, f"Error initializing AEOS client: {str(e)}", "error")
+            import traceback
+            traceback.print_exc()
+            return
         
         yield send_progress(5, "Fetching analytics channels...", "info")
         await asyncio.sleep(0)
