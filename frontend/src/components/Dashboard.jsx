@@ -8,7 +8,6 @@ import DoubleBookingsTable from './DoubleBookingsTable';
 import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from './AdditionalMetrics';
 import AdvancedFilters from './AdvancedFilters';
 import AIInsights from './AIInsights';
-import SpotEfficiencyOverview from './SpotEfficiencyOverview';
 
 export default function Dashboard({ data }) {
     const { metrics, window_summaries, data: rawData, field_map: fieldMap } = data;
@@ -252,9 +251,6 @@ export default function Dashboard({ data }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* AI Insights */}
             <AIInsights metrics={metrics} />
-
-            {/* Spot Efficiency Overview */}
-            <SpotEfficiencyOverview metrics={displayMetrics} data={dataToUse} />
 
             {/* Summary Metrics */}
             <div className="grid grid-cols-4" style={{ gap: '24px' }}>
