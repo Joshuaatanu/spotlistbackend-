@@ -1,7 +1,23 @@
 import { useEffect } from 'react';
 import { Database, Calendar, Building2 } from 'lucide-react';
+import ReportTypeSelector from './ReportTypeSelector';
+import EnhancedFilters from './EnhancedFilters';
+import CompanySelector from './CompanySelector';
 
-export default function AeosDataFetch({ companyName, setCompanyName, dateFrom, setDateFrom, dateTo, setDateTo, channelFilter, setChannelFilter }) {
+export default function AeosDataFetch({ 
+  companyName, 
+  setCompanyName, 
+  dateFrom, 
+  setDateFrom, 
+  dateTo, 
+  setDateTo, 
+  channelFilter, 
+  setChannelFilter,
+  reportType,
+  setReportType,
+  filters,
+  setFilters
+}) {
     // Set default date range to last 7 days if not set
     const getDefaultDateTo = () => {
         const today = new Date();
@@ -27,43 +43,11 @@ export default function AeosDataFetch({ companyName, setCompanyName, dateFrom, s
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-m)' }}>
-            <div>
-                <label style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 'var(--space-s)',
-                    marginBottom: 'var(--space-s)',
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 500,
-                    color: 'var(--text-primary)'
-                }}>
-                    <Building2 size={16} />
-                    Company Name
-                </label>
-                <input
-                    type="text"
-                    value={companyName}
-                    onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="e.g., eBay, Amazon, RTL"
-                    style={{
-                        width: '100%',
-                        padding: 'var(--space-m)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        fontSize: 'var(--font-size-base)',
-                        backgroundColor: 'var(--bg-secondary)',
-                        color: 'var(--text-primary)'
-                    }}
-                />
-                <p style={{
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--text-tertiary)',
-                    marginTop: 'var(--space-xs)',
-                    margin: 'var(--space-xs) 0 0 0'
-                }}>
-                    Enter the company name to search for in TV audit data
-                </p>
-            </div>
+            {/* Company Selector with Dropdown */}
+            <CompanySelector 
+                companyName={companyName}
+                setCompanyName={setCompanyName}
+            />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-m)' }}>
                 <div>
@@ -128,6 +112,12 @@ export default function AeosDataFetch({ companyName, setCompanyName, dateFrom, s
                 </div>
             </div>
 
+            {/* Report Type Selector */}
+            <ReportTypeSelector 
+                reportType={reportType || 'spotlist'} 
+                setReportType={setReportType || (() => {})} 
+            />
+
             <div>
                 <label style={{
                     display: 'flex',
@@ -167,6 +157,12 @@ export default function AeosDataFetch({ companyName, setCompanyName, dateFrom, s
                         : 'Searching all available channels'}
                 </p>
             </div>
+
+            {/* Enhanced Filters */}
+            <EnhancedFilters 
+                filters={filters || {}} 
+                setFilters={setFilters || (() => {})}
+            />
 
             <div style={{
                 padding: 'var(--space-m)',

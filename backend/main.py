@@ -294,6 +294,121 @@ def json_safe(value: Any) -> Any:
 async def health_check():
     return {"status": "ok"}
 
+
+# Metadata endpoints for enhanced filtering
+@app.get("/metadata/dayparts")
+async def get_dayparts():
+    """Get available dayparts for filtering."""
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        from aeos_metadata import AEOSMetadata
+        metadata = AEOSMetadata(client)
+        dayparts = await loop.run_in_executor(None, metadata.get_dayparts)
+        # Normalize response format
+        if isinstance(dayparts, list):
+            return dayparts
+        elif isinstance(dayparts, dict) and "all" in dayparts:
+            return dayparts["all"]
+        return []
+    except Exception as e:
+        print(f"Error fetching dayparts: {e}")
+        return []
+
+
+@app.get("/metadata/epg-categories")
+async def get_epg_categories():
+    """Get available EPG categories for filtering."""
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        from aeos_metadata import AEOSMetadata
+        metadata = AEOSMetadata(client)
+        categories = await loop.run_in_executor(None, metadata.get_epg_categories)
+        # Normalize response format
+        if isinstance(categories, list):
+            return categories
+        elif isinstance(categories, dict) and "all" in categories:
+            return categories["all"]
+        return []
+    except Exception as e:
+        print(f"Error fetching EPG categories: {e}")
+        return []
+
+
+@app.get("/metadata/profiles")
+async def get_profiles():
+    """Get available audience profiles for filtering."""
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        from aeos_metadata import AEOSMetadata
+        metadata = AEOSMetadata(client)
+        profiles = await loop.run_in_executor(None, metadata.get_profiles)
+        # Normalize response format
+        if isinstance(profiles, list):
+            return profiles
+        elif isinstance(profiles, dict) and "all" in profiles:
+            return profiles["all"]
+        return []
+    except Exception as e:
+        print(f"Error fetching profiles: {e}")
+        return []
+
+
+@app.get("/metadata/channels")
+async def get_channels():
+    """Get available channels for selection."""
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        # Get all channels (analytics + EPG)
+        channels = await loop.run_in_executor(None, lambda: client.load_all_channels())
+        # Return all channels from cache
+        if channels and "all" in channels:
+            return channels["all"]
+        elif isinstance(channels, list):
+            return channels
+        return []
+    except Exception as e:
+        print(f"Error fetching channels: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+@app.get("/metadata/companies")
+async def get_companies(filter_text: str = ""):
+    """Get available companies for selection."""
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        from aeos_metadata import AEOSMetadata
+        metadata = AEOSMetadata(client)
+        # Call get_companies with industry_ids=None and filter_text
+        companies = await loop.run_in_executor(None, lambda: metadata.get_companies(industry_ids=None, filter_text=filter_text))
+        # Normalize response format
+        if isinstance(companies, list):
+            return companies
+        elif isinstance(companies, dict) and "all" in companies:
+            return companies["all"]
+        return []
+    except Exception as e:
+        print(f"Error fetching companies: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 @app.post("/analyze")
 async def analyze_spotlist(
     file: UploadFile = File(...),
@@ -469,6 +584,10 @@ async def analyze_spotlist(
     try:
         records = dataframe_to_records(df_annotated)
         
+        # Get report_type from request if available (passed via form data)
+        # For now, default to 'spotlist' - this will be enhanced when different report types are implemented
+        report_type_from_request = report_type if 'report_type' in locals() else 'spotlist'
+        
         result = {
             "metrics": {**metrics, **additional_metrics, **efficiency_metrics}, # Metrics for the selected window + additional metrics + efficiency metrics
             "window_summaries": window_summaries,
@@ -483,6 +602,9 @@ async def analyze_spotlist(
                 "duration_column": duration_col if duration_col else None,
                 "epg_category_column": epg_category_col if epg_category_col else None,
             },
+            "metadata": {
+                "report_type": report_type_from_request if 'report_type_from_request' in locals() else 'spotlist',
+            },
         }
         
         return JSONResponse(content=json_safe(result))
@@ -492,13 +614,19 @@ async def analyze_spotlist(
 
 
 async def stream_progress_updates(
-    company_name: str,
+    company_name: Optional[str],
     date_from: str,
     date_to: str,
     creative_match_mode: int,
     creative_match_text: str,
     time_window_minutes: int,
     channel_filter: Optional[str] = None,
+    report_type: str = "spotlist",
+    top_ten_subtype: str = "spots",
+    weekdays: Optional[List[int]] = None,
+    dayparts: Optional[List[str]] = None,  # Daypart values like "6 - 9" (not IDs)
+    epg_categories: Optional[List[int]] = None,
+    profiles: Optional[List[int]] = None,
 ) -> AsyncGenerator[str, None]:
     """Generator that yields progress updates as SSE events"""
     
@@ -592,6 +720,254 @@ async def stream_progress_updates(
         total_channels = len(all_channels)
         yield send_progress(10, f"Searching {total_channels} channel(s)", "info")
         
+        # Handle different report types
+        if report_type == "topTen":
+            # Top Ten Report - Uses documented API endpoints (v2.3 Sections 4.3.4-4.3.6)
+            # Note: Top Ten reports use "period" parameter ("Yesterday" or "Last 7 days")
+            # not date_from/date_to. We'll calculate period from date range.
+            yield send_progress(20, f"Generating Top Ten report...", "info")
+            try:
+                from report_types import TopTenReport
+                from datetime import datetime, timedelta
+                
+                top_ten = TopTenReport(client)
+                
+                # Calculate period from date range
+                # Top Ten API only supports "Yesterday" or "Last 7 days"
+                date_from_obj = datetime.strptime(date_from, "%Y-%m-%d")
+                date_to_obj = datetime.strptime(date_to, "%Y-%m-%d")
+                today = datetime.now().date()
+                yesterday = today - timedelta(days=1)
+                
+                # Determine period based on date range
+                if date_to_obj.date() == yesterday:
+                    period = "Yesterday"
+                else:
+                    period = "Last 7 days"  # Default to 7 days for any other range
+                
+                # Use subtype from form parameter (defaults to "spots" if not provided)
+                # Valid values: "spots", "events", "channel"
+                if top_ten_subtype not in ["spots", "events", "channel"]:
+                    top_ten_subtype = "spots"  # Fallback to default
+                
+                result_data = await loop.run_in_executor(
+                    None,
+                    top_ten.get_top_ten,
+                    top_ten_subtype,
+                    period,
+                    5,  # poll_interval
+                    600,  # timeout
+                )
+                
+                df = pd.DataFrame(result_data if result_data else [])
+                yield send_progress(100, f"Top Ten report complete! Found {len(df)} results.", "success")
+                
+                raw_data_result = {
+                    "raw_data": dataframe_to_records(df),
+                    "metadata": {
+                        "company_name": company_name,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "period": period,  # Store the calculated period
+                        "top_ten_type": top_ten_subtype,  # Store which Top Ten type was used
+                        "channel_filter": channel_filter if channel_filter else None,
+                        "report_type": report_type,
+                        "total_records": len(df),
+                        "channels_found": [],
+                        "format_detected": "topTen",
+                        "column_map": {},
+                    }
+                }
+                yield f"data: {json.dumps({'progress': 100, 'message': 'collection_complete', 'raw_data': json_safe(raw_data_result)})}\n\n"
+                return
+            except Exception as e:
+                yield send_progress(0, f"Error generating Top Ten report: {str(e)}", "error")
+                import traceback
+                traceback.print_exc()
+                return
+        
+        elif report_type == "reachFrequency":
+            # Reach & Frequency Report - Uses Deep Analysis Advertising Report (API v2.3 Section 4.3.2)
+            yield send_progress(20, f"Generating Reach & Frequency report...", "info")
+            try:
+                from report_types import ReachFrequencyReport
+                rf_report = ReachFrequencyReport(client)
+                channel_ids = [ch["value"] for ch in all_channels[:5]]  # Limit to 5 channels for RF
+                
+                # Get company ID if company name is provided
+                company_ids = None
+                if company_name:
+                    from aeos_metadata import AEOSMetadata
+                    metadata = AEOSMetadata(client)
+                    company_obj = await loop.run_in_executor(None, metadata.find_company, company_name)
+                    if company_obj:
+                        company_ids = [company_obj.get("value") or company_obj.get("id")]
+                
+                result_data = await loop.run_in_executor(
+                    None,
+                    rf_report.get_reach_frequency,
+                    date_from,
+                    date_to,
+                    channel_ids,
+                    company_ids,
+                    None,  # brand_ids
+                    None,  # product_ids
+                    profiles,
+                    dayparts,
+                    None,  # industries
+                    None,  # categories
+                    None,  # subcategories
+                    "1+",  # frequency (default)
+                    "By Day",  # showdataby (default)
+                    5,  # poll_interval
+                    600,  # timeout
+                )
+                
+                # Convert result to list format if it's a dict
+                if isinstance(result_data, dict):
+                    # Try to extract list from dict structure
+                    if "data" in result_data:
+                        result_list = result_data["data"]
+                    elif "body" in result_data:
+                        result_list = result_data["body"]
+                    else:
+                        # Convert dict to list of dicts
+                        result_list = [result_data]
+                else:
+                    result_list = result_data if result_data else []
+                
+                df = pd.DataFrame(result_list if isinstance(result_list, list) else [])
+                yield send_progress(100, f"Reach & Frequency report complete! Found {len(df)} results.", "success")
+                
+                raw_data_result = {
+                    "raw_data": dataframe_to_records(df),
+                    "metadata": {
+                        "company_name": company_name,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "channel_filter": channel_filter if channel_filter else None,
+                        "report_type": report_type,
+                        "total_spots": len(df),
+                        "channels_found": [],
+                        "format_detected": "reachFrequency",
+                        "column_map": {},
+                    }
+                }
+                yield f"data: {json.dumps({'progress': 100, 'message': 'collection_complete', 'raw_data': json_safe(raw_data_result)})}\n\n"
+                return
+            except Exception as e:
+                yield send_progress(0, f"Error generating Reach & Frequency report: {str(e)}", "error")
+                import traceback
+                traceback.print_exc()
+                return
+        
+        elif report_type == "deepAnalysis":
+            # Deep Analysis (KPI) Report
+            yield send_progress(20, f"Generating Deep Analysis (KPI) report...", "info")
+            try:
+                channel_ids = [ch["value"] for ch in all_channels[:10]]  # Limit channels for performance
+                
+                result_data = await loop.run_in_executor(
+                    None,
+                    client.get_channel_kpis,
+                    date_from,
+                    date_to,
+                    channel_ids,
+                    ["amr-perc", "reach (%)", "reach-avg", "share", "ats-avg", "atv-avg", "airings"],
+                    profiles,
+                    dayparts,
+                    epg_categories,
+                    "-1",  # splitby
+                    "5sec",  # threshold
+                    "period",  # showdataby
+                    5,  # poll_interval
+                    600,  # timeout
+                )
+                
+                df = pd.DataFrame(result_data if result_data else [])
+                yield send_progress(100, f"Deep Analysis report complete! Found {len(df)} channel KPIs.", "success")
+                
+                raw_data_result = {
+                    "raw_data": dataframe_to_records(df),
+                    "metadata": {
+                        "company_name": company_name,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "channel_filter": channel_filter if channel_filter else None,
+                        "report_type": report_type,
+                        "total_spots": len(df),
+                        "channels_found": [ch["caption"] for ch in all_channels[:10]],
+                        "format_detected": "deepAnalysis",
+                        "column_map": {},
+                    }
+                }
+                yield f"data: {json.dumps({'progress': 100, 'message': 'collection_complete', 'raw_data': json_safe(raw_data_result)})}\n\n"
+                return
+            except Exception as e:
+                yield send_progress(0, f"Error generating Deep Analysis report: {str(e)}", "error")
+                import traceback
+                traceback.print_exc()
+                return
+        
+        elif report_type == "daypartAnalysis":
+            # Daypart Analysis Report - Uses Deep Analysis Channel Event Report (API v2.3 Section 4.3.1)
+            yield send_progress(20, f"Generating Daypart Analysis report...", "info")
+            try:
+                from report_types import DaypartAnalysisReport
+                daypart_report = DaypartAnalysisReport(client)
+                channel_ids = [ch["value"] for ch in all_channels[:5]]  # Limit channels
+                
+                # Note: Channel Event Report doesn't directly support company filtering
+                # For company-specific daypart analysis, consider using Deep Analysis Advertising Report
+                # For now, we'll use Channel Event Report with daypart filters
+                
+                # Convert dayparts from IDs to values if needed (dayparts should be strings like "6 - 9")
+                daypart_values = dayparts if dayparts else None
+                
+                result_data = await loop.run_in_executor(
+                    None,
+                    daypart_report.get_daypart_analysis,
+                    date_from,
+                    date_to,
+                    channel_ids,
+                    None,  # company_ids (not supported in Channel Event Report)
+                    daypart_values,  # dayparts filter (list of strings like "6 - 9")
+                    ["reach (%)", "share", "amr-perc", "ats-avg"],  # Channel Event compatible variables
+                    profiles,  # profiles
+                    epg_categories,  # epg_categories
+                    "-1",  # splitby (no time split)
+                    "By Day",  # showdataby
+                    "5sec",  # threshold
+                    5,  # poll_interval
+                    600,  # timeout
+                )
+                
+                df = pd.DataFrame(result_data if result_data else [])
+                yield send_progress(100, f"Daypart Analysis report complete! Found {len(df)} results.", "success")
+                
+                raw_data_result = {
+                    "raw_data": dataframe_to_records(df),
+                    "metadata": {
+                        "company_name": company_name,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "channel_filter": channel_filter if channel_filter else None,
+                        "report_type": report_type,
+                        "total_spots": len(df),
+                        "channels_found": [ch["caption"] for ch in all_channels[:5]],
+                        "format_detected": "daypartAnalysis",
+                        "column_map": {},
+                    }
+                }
+                yield f"data: {json.dumps({'progress': 100, 'message': 'collection_complete', 'raw_data': json_safe(raw_data_result)})}\n\n"
+                return
+            except Exception as e:
+                yield send_progress(0, f"Error generating Daypart Analysis report: {str(e)}", "error")
+                import traceback
+                traceback.print_exc()
+                return
+
+        # Default: Spotlist Report (existing logic)
         # 3. Fetch spotlists for each channel and filter by company
         all_rows = []
         target = company_name.lower()
@@ -620,22 +996,54 @@ async def stream_progress_updates(
                 )
                 
                 # Run blocking operation in thread pool
+                # Use enhanced spotlist with filters if available
                 loop = asyncio.get_event_loop()
-                report = await loop.run_in_executor(
-                    None,
-                    checker.get_spotlist,
-                    channel_id,
-                    date_from,
-                    date_to,
-                )
+                
+                # Check if we should use enhanced filtering
+                if dayparts or weekdays or epg_categories:
+                    # Use enhanced spotlist report with filters
+                    from report_types import EnhancedSpotlistReport
+                    enhanced_spotlist = EnhancedSpotlistReport(client)
+                    report_rows = await loop.run_in_executor(
+                        None,
+                        enhanced_spotlist.get_spotlist,
+                        date_from,
+                        date_to,
+                        [channel_id],
+                        None,  # company_ids
+                        None,  # brand_ids
+                        None,  # product_ids
+                        None,  # industry_ids
+                        None,  # category_ids
+                        None,  # subcategory_ids
+                        dayparts,
+                        weekdays,
+                        epg_categories,
+                        True,  # use_medium_report
+                        5,     # poll_interval
+                        600,   # timeout
+                    )
+                    # Convert rows to report format
+                    if report_rows:
+                        rows = report_rows
+                    else:
+                        rows = []
+                else:
+                    # Use standard spotlist
+                    report = await loop.run_in_executor(
+                        None,
+                        checker.get_spotlist,
+                        channel_id,
+                        date_from,
+                        date_to,
+                    )
+                    rows = flatten_spotlist_report(report)
                 
                 yield send_progress(
                     int(progress + 2),
                     f"Processing data from {channel_caption}...",
                     "info"
                 )
-                
-                rows = flatten_spotlist_report(report)
                 
                 if not rows:
                     continue
@@ -712,6 +1120,7 @@ async def stream_progress_updates(
                 "date_from": date_from,
                 "date_to": date_to,
                 "channel_filter": channel_filter if channel_filter else None,
+                "report_type": report_type,  # Include report type in metadata
                 "total_spots": len(df),
                 "channels_found": list(df[detected_program_col].unique().astype(str)) if detected_program_col and detected_program_col in df.columns else [],
                 "format_detected": detected_format,
@@ -729,13 +1138,19 @@ async def stream_progress_updates(
 
 @app.post("/analyze-from-aeos")
 async def analyze_from_aeos(
-    company_name: str = Form(...),
+    company_name: str = Form(""),  # Optional - not required for Top Ten reports
     date_from: str = Form(...),
     date_to: str = Form(...),
     creative_match_mode: int = Form(1),
     creative_match_text: str = Form(""),
     time_window_minutes: int = Form(60),
     channel_filter: str = Form(""),
+    report_type: str = Form("spotlist"),
+    top_ten_subtype: str = Form(""),  # Optional - only used for Top Ten reports
+    weekdays: str = Form(""),
+    dayparts: str = Form(""),
+    epg_categories: str = Form(""),
+    profiles: str = Form(""),
 ):
     """
     Fetch spotlist data from AEOS API by company name and date range,
@@ -745,15 +1160,39 @@ async def analyze_from_aeos(
     channel_filter: Optional channel name to filter by (e.g., "VOX"). 
                    If empty, searches all channels.
     """
+    # Parse filter JSON strings
+    weekdays_list = None
+    dayparts_list = None
+    epg_categories_list = None
+    profiles_list = None
+    
+    try:
+        if weekdays:
+            weekdays_list = json.loads(weekdays)
+        if dayparts:
+            dayparts_list = json.loads(dayparts)
+        if epg_categories:
+            epg_categories_list = json.loads(epg_categories)
+        if profiles:
+            profiles_list = json.loads(profiles)
+    except json.JSONDecodeError:
+        pass  # Use None if parsing fails
+    
     return StreamingResponse(
         stream_progress_updates(
-            company_name=company_name,
+            company_name=company_name if company_name else None,
             date_from=date_from,
             date_to=date_to,
             creative_match_mode=creative_match_mode,
             creative_match_text=creative_match_text,
             time_window_minutes=time_window_minutes,
             channel_filter=channel_filter if channel_filter else None,
+            report_type=report_type,
+            top_ten_subtype=top_ten_subtype if top_ten_subtype else "spots",
+            weekdays=weekdays_list,
+            dayparts=dayparts_list,
+            epg_categories=epg_categories_list,
+            profiles=profiles_list,
         ),
         media_type="text/event-stream",
         headers={

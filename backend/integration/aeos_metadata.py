@@ -78,3 +78,91 @@ class AEOSMetadata:
         """Find a product by name within a given brand."""
         products = self.get_products([brand_id])
         return self._find_by_caption(products, product_name)
+
+    # ---- Additional metadata helpers ----
+    
+    def get_categories(self, filter_text: str = ""):
+        """Return list of advertisement categories. Optional text filter.
+        Maps to helper/getCategories.
+        """
+        payload: dict = {"filter": filter_text} if filter_text else {"filter": ""}
+        try:
+            return self.client.post_helper("getCategories", payload)
+        except Exception:
+            # Fallback if endpoint doesn't exist
+            return []
+
+    def get_subcategories(
+        self,
+        category_ids: Sequence[int] | None = None,
+        filter_text: str = "",
+    ):
+        """Return list of subcategories. Optional category filter and text filter.
+        Maps to helper/getSubcategories.
+        """
+        payload: dict = {}
+        if category_ids:
+            payload["categories"] = list(category_ids)
+        payload["filter"] = filter_text if filter_text else ""
+        try:
+            return self.client.post_helper("getSubcategories", payload)
+        except Exception:
+            # Fallback if endpoint doesn't exist
+            return []
+
+    def get_dayparts(self, filter_text: str = ""):
+        """Return list of available daypart definitions.
+        Maps to helper/getDayparts.
+        Dayparts are time-of-day segments (e.g., "Prime Time", "Daytime").
+        """
+        payload: dict = {"filter": filter_text} if filter_text else {"filter": ""}
+        try:
+            return self.client.post_helper("getDayparts", payload)
+        except Exception:
+            # Fallback if endpoint doesn't exist
+            return []
+
+    def get_epg_categories(self, filter_text: str = ""):
+        """Return list of EPG (Electronic Program Guide) categories.
+        Maps to helper/getEPGCategories.
+        EPG categories represent program types (e.g., "News", "Sports", "Entertainment").
+        """
+        payload: dict = {"filter": filter_text} if filter_text else {"filter": ""}
+        try:
+            return self.client.post_helper("getEPGCategories", payload)
+        except Exception:
+            # Fallback if endpoint doesn't exist
+            return []
+
+    def get_profiles(self, filter_text: str = ""):
+        """Return list of audience profiles (target demographics).
+        Maps to helper/getProfiles.
+        Profiles represent target audience segments for analysis.
+        """
+        payload: dict = {"filter": filter_text} if filter_text else {"filter": ""}
+        try:
+            return self.client.post_helper("getProfiles", payload)
+        except Exception:
+            # Fallback if endpoint doesn't exist
+            return []
+
+    def find_category(self, name: str):
+        """Find a category by exact caption match."""
+        return self._find_by_caption(self.get_categories(), name)
+
+    def find_subcategory(self, category_id: int, subcategory_name: str):
+        """Find a subcategory by name within a given category."""
+        subcategories = self.get_subcategories([category_id])
+        return self._find_by_caption(subcategories, subcategory_name)
+
+    def find_daypart(self, name: str):
+        """Find a daypart by exact caption match."""
+        return self._find_by_caption(self.get_dayparts(), name)
+
+    def find_epg_category(self, name: str):
+        """Find an EPG category by exact caption match."""
+        return self._find_by_caption(self.get_epg_categories(), name)
+
+    def find_profile(self, name: str):
+        """Find a profile by exact caption match."""
+        return self._find_by_caption(self.get_profiles(), name)

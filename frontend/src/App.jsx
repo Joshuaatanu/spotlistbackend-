@@ -3,7 +3,7 @@ import { Upload, FileText, Clock, Settings, Database, Download, Activity } from 
 import axios from 'axios';
 import { API_BASE_URL } from './config';
 import FileUpload from './components/FileUpload';
-import AeosDataFetch from './components/AeosDataFetch';
+import AeosDataFetch from './components/AeosDataFetchOptimized';
 import ConfigPanel from './components/ConfigPanel';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
@@ -17,6 +17,14 @@ function App() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
+  const [reportType, setReportType] = useState('spotlist');
+  const [topTenSubtype, setTopTenSubtype] = useState('spots'); // 'spots', 'events', or 'channel'
+  const [filters, setFilters] = useState({
+    weekdays: [],
+    dayparts: [],
+    epgCategories: [],
+    profiles: []
+  });
   const [config, setConfig] = useState({
     creative_match_mode: 1,
     creative_match_text: '',
@@ -65,7 +73,9 @@ function App() {
   };
 
   const handleAnalyzeAeos = async () => {
-    if (!companyName || !dateFrom || !dateTo) return;
+    // Company name is required only for certain report types
+    const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+    if ((requiresCompany && !companyName) || !dateFrom || !dateTo) return;
 
     setLoading(true);
     setError(null);
@@ -73,11 +83,29 @@ function App() {
     setProgress({ percentage: 0, message: 'Starting data collection...', stage: 'info' });
 
     const formData = new FormData();
-    formData.append('company_name', companyName);
+    formData.append('company_name', companyName || '');
     formData.append('date_from', dateFrom);
     formData.append('date_to', dateTo);
+    formData.append('report_type', reportType || 'spotlist');
     // Always send channel_filter, even if empty (backend will handle it)
     formData.append('channel_filter', channelFilter || '');
+    // Add Top Ten subtype (always send, defaults to 'spots' if not Top Ten)
+    formData.append('top_ten_subtype', reportType === 'topTen' ? (topTenSubtype || 'spots') : 'spots');
+    
+    // Add enhanced filters
+    if (filters.weekdays && filters.weekdays.length > 0) {
+      formData.append('weekdays', JSON.stringify(filters.weekdays));
+    }
+    if (filters.dayparts && filters.dayparts.length > 0) {
+      formData.append('dayparts', JSON.stringify(filters.dayparts));
+    }
+    if (filters.epgCategories && filters.epgCategories.length > 0) {
+      formData.append('epg_categories', JSON.stringify(filters.epgCategories));
+    }
+    if (filters.profiles && filters.profiles.length > 0) {
+      formData.append('profiles', JSON.stringify(filters.profiles));
+    }
+    
     Object.keys(config).forEach(key => {
       formData.append(key, config[key]);
     });
@@ -189,7 +217,9 @@ function App() {
         ...response.data,
         fileName: collectedData.fileName,
         timestamp: new Date().toISOString(),
-        id: Date.now()
+        id: Date.now(),
+        // Preserve metadata from collected data (including report_type)
+        metadata: collectedData.metadata || response.data.metadata || {}
       };
       setResults(analysisResult);
       setCollectedData(null);
@@ -353,6 +383,12 @@ function App() {
                         setDateTo={setDateTo}
                         channelFilter={channelFilter}
                         setChannelFilter={setChannelFilter}
+                        reportType={reportType}
+                        setReportType={setReportType}
+                        filters={filters}
+                        setFilters={setFilters}
+                        topTenSubtype={topTenSubtype}
+                        setTopTenSubtype={setTopTenSubtype}
                       />
                     )}
 
@@ -556,7 +592,11 @@ function App() {
                         )}
                         <button
                           onClick={handleAnalyzeAeos}
-                          disabled={!companyName || !dateFrom || !dateTo || loading}
+                          disabled={(() => {
+                            // Company name is required only for certain report types
+                            const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+                            return (requiresCompany && !companyName) || !dateFrom || !dateTo || loading;
+                          })()}
                           className="btn"
                           style={{ 
                             width: '100%', 
@@ -568,8 +608,14 @@ function App() {
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
-                            cursor: (!companyName || !dateFrom || !dateTo || loading) ? 'not-allowed' : 'pointer',
-                            opacity: (!companyName || !dateFrom || !dateTo || loading) ? 0.6 : 1,
+                            cursor: (() => {
+                              const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+                              return ((requiresCompany && !companyName) || !dateFrom || !dateTo || loading) ? 'not-allowed' : 'pointer';
+                            })(),
+                            opacity: (() => {
+                              const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+                              return ((requiresCompany && !companyName) || !dateFrom || !dateTo || loading) ? 0.6 : 1;
+                            })(),
                             transition: 'opacity var(--transition-base)'
                           }}
                         >
@@ -600,8 +646,12 @@ function App() {
                     <button
                       onClick={dataSource === 'file' ? handleAnalyze : handleAnalyzeAeos}
                       disabled={
-                        (dataSource === 'file' && !file) || 
-                        (dataSource === 'aeos' && (!companyName || !dateFrom || !dateTo)) || 
+                        (dataSource === 'file' && !file) ||
+                        (dataSource === 'aeos' && (() => {
+                          // Company name is required only for certain report types
+                          const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+                          return (requiresCompany && !companyName) || !dateFrom || !dateTo;
+                        })()) ||
                         loading
                       }
                       className="btn"

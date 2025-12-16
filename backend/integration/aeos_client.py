@@ -310,9 +310,17 @@ class AEOSClient:
         date_to: str,
         channel_ids: list[int],
         kpis: list[str] | None = None,
+        profiles: list[int] | None = None,
+        dayparts: list[str] | None = None,  # Daypart values like "6 - 9" (not IDs)
+        epg_categories: list[int] | None = None,
+        splitby: str = "-1",
+        threshold: str = "5sec",
+        showdataby: str = "period",
+        poll_interval: int = 5,
+        timeout: int = 600,
     ) -> list[dict]:
         """
-        Channel/Event Analysis KPI helper (section 4.3.1).
+        Enhanced Channel/Event Analysis KPI helper (section 4.3.1) with full filtering.
 
         Returns rows with per-channel KPIs such as:
         - amr-perc
@@ -322,6 +330,23 @@ class AEOSClient:
         - ats-avg
         - atv-avg
         - airings
+
+        Args:
+            date_from: Start date (YYYY-MM-DD)
+            date_to: End date (YYYY-MM-DD)
+            channel_ids: List of channel IDs to analyze
+            kpis: List of KPI variables to include (default: all standard KPIs)
+            profiles: Optional list of audience profile IDs for targeting
+            dayparts: Optional list of daypart values (strings like "6 - 9") for time-based filtering
+            epg_categories: Optional list of EPG category IDs for program-based filtering
+            splitby: Time split granularity ("-1" = no split, "day" = daily, "week" = weekly, etc.)
+            threshold: Minimum viewing duration (default: "5sec")
+            showdataby: Aggregation level ("period" = aggregate, "day" = daily breakdown, etc.)
+            poll_interval: Polling interval in seconds
+            timeout: Maximum wait time in seconds
+
+        Returns:
+            List of dictionaries with KPI data
         """
         if kpis is None:
             kpis = [
@@ -336,25 +361,38 @@ class AEOSClient:
 
         payload = {
             # Section 4.3.1 INITIATEDEEPANALYSISCHANNELEVENTREPORT
-            "splitby": "-1",          # no time split
-            "date_from": date_from,   # YYYY-MM-DD
-            "date_to": date_to,       # YYYY-MM-DD
-            "threshold": "5sec",
+            "splitby": splitby,
+            "date_from": date_from,
+            "date_to": date_to,
+            "threshold": threshold,
             "channels": channel_ids,
-            "profiles": [],
-            "dayparts": [],
             "variables": kpis,
-            "showdataby": "period",   # aggregate across the period
-            "epg_categories": [],
+            "showdataby": showdataby,
         }
+
+        # Add optional filters
+        if profiles is not None:
+            payload["profiles"] = profiles
+        else:
+            payload["profiles"] = []
+
+        if dayparts is not None:
+            payload["dayparts"] = dayparts
+        else:
+            payload["dayparts"] = []
+
+        if epg_categories is not None:
+            payload["epg_categories"] = epg_categories
+        else:
+            payload["epg_categories"] = []
 
         resp = self.post_report("initiateDeepAnalysisChannelEventReport", payload)
         if "report_id" not in resp:
             raise RuntimeError(f"Channel KPI report not accepted: {resp}")
         report_id = resp["report_id"]
 
-        # reuse existing helpers
-        self.wait_for_report(report_id, poll_interval=5, timeout=600)
+        # Wait for report with configurable polling
+        self.wait_for_report(report_id, poll_interval=poll_interval, timeout=timeout)
         data = self.get_report_data(report_id)
         
         # Handle nested structure: body contains 'body' and 'header' keys
@@ -376,3 +414,61 @@ class AEOSClient:
         from utils import flatten_spotlist_report
         rows = flatten_spotlist_report(normalized_data)
         return rows
+
+    def get_enhanced_deep_analysis(
+        self,
+        date_from: str,
+        date_to: str,
+        channel_ids: list[int],
+        kpis: list[str] | None = None,
+        profiles: list[int] | None = None,
+        dayparts: list[str] | None = None,  # Daypart values like "6 - 9" (not IDs)
+        epg_categories: list[int] | None = None,
+        company_ids: list[int] | None = None,
+        brand_ids: list[int] | None = None,
+        splitby: str = "-1",
+        threshold: str = "5sec",
+        showdataby: str = "period",
+        poll_interval: int = 5,
+        timeout: int = 600,
+    ) -> list[dict]:
+        """
+        Enhanced Deep Analysis with full filtering capabilities.
+        
+        This is a more comprehensive version that supports additional filters
+        like companies and brands (if supported by the API version).
+
+        Args:
+            date_from: Start date (YYYY-MM-DD)
+            date_to: End date (YYYY-MM-DD)
+            channel_ids: List of channel IDs
+            kpis: List of KPI variables
+            profiles: Optional audience profile IDs
+            dayparts: Optional daypart IDs
+            epg_categories: Optional EPG category IDs
+            company_ids: Optional company IDs for filtering
+            brand_ids: Optional brand IDs for filtering
+            splitby: Time split granularity
+            threshold: Minimum viewing duration
+            showdataby: Aggregation level
+            poll_interval: Polling interval
+            timeout: Maximum wait time
+
+        Returns:
+            List of dictionaries with analysis data
+        """
+        # Use the enhanced get_channel_kpis as base
+        return self.get_channel_kpis(
+            date_from=date_from,
+            date_to=date_to,
+            channel_ids=channel_ids,
+            kpis=kpis,
+            profiles=profiles,
+            dayparts=dayparts,
+            epg_categories=epg_categories,
+            splitby=splitby,
+            threshold=threshold,
+            showdataby=showdataby,
+            poll_interval=poll_interval,
+            timeout=timeout,
+        )

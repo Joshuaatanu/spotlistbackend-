@@ -8,11 +8,59 @@ import DoubleBookingsTable from './DoubleBookingsTable';
 import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from './AdditionalMetrics';
 import AdvancedFilters from './AdvancedFilters';
 import AIInsights from './AIInsights';
+import TopTenReportView from './TopTenReportView';
+import ReachFrequencyReportView from './ReachFrequencyReportView';
+import DeepAnalysisReportView from './DeepAnalysisReportView';
+import DashboardOverview from './DashboardOverview';
 
 export default function Dashboard({ data }) {
-    const { metrics, window_summaries, data: rawData, field_map: fieldMap } = data;
+    const { metrics, window_summaries, data: rawData, field_map: fieldMap, metadata } = data || {};
     const [filters, setFilters] = useState(null);
     const [filteredData, setFilteredData] = useState(null);
+    
+    // Detect report type from metadata or data structure
+    const reportType = useMemo(() => {
+        // Check metadata first
+        if (metadata?.report_type) {
+            return metadata.report_type;
+        }
+        
+        // Check data structure to infer report type
+        if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
+            return 'spotlist'; // Default
+        }
+        
+        const firstItem = rawData[0];
+        const keys = Object.keys(firstItem);
+        
+        // Check for Top Ten indicators (ranking, top entities)
+        if (keys.some(k => k.toLowerCase().includes('rank')) || 
+            keys.some(k => k.toLowerCase().includes('top'))) {
+            return 'topTen';
+        }
+        
+        // Check for Reach & Frequency indicators
+        if (keys.some(k => k.toLowerCase().includes('frequency')) &&
+            keys.some(k => k.toLowerCase().includes('reach'))) {
+            return 'reachFrequency';
+        }
+        
+        // Check for Deep Analysis KPIs
+        if (keys.some(k => ['amr-perc', 'amr_perc', 'share', 'ats-avg', 'atv-avg'].includes(k.toLowerCase())) ||
+            keys.some(k => k.toLowerCase().includes('amr')) ||
+            keys.some(k => k.toLowerCase().includes('share'))) {
+            return 'deepAnalysis';
+        }
+        
+        // Check for daypart analysis structure
+        if (keys.some(k => k.toLowerCase().includes('daypart')) &&
+            !keys.some(k => k.toLowerCase().includes('is_double'))) {
+            return 'daypartAnalysis';
+        }
+        
+        // Default to spotlist (has is_double, cost, etc.)
+        return 'spotlist';
+    }, [metadata, rawData]);
     
     // Use 120-minute window metrics by default (matching personal analysis)
     const displayMetrics = useMemo(() => {
@@ -244,15 +292,106 @@ export default function Dashboard({ data }) {
     };
 
     // Check if additional metrics are available
-    const hasXRP = displayMetrics.total_xrp !== undefined;
-    const hasReach = displayMetrics.total_reach !== undefined;
+    const hasXRP = displayMetrics?.total_xrp !== undefined;
+    const hasReach = displayMetrics?.total_reach !== undefined;
 
+    // Render report-type-specific views
+    if (reportType === 'topTen') {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
+                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
+                <TopTenReportView data={rawData} reportType={reportType} />
+            </div>
+        );
+    }
+
+    if (reportType === 'reachFrequency') {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
+                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
+                <ReachFrequencyReportView data={rawData || data} reportType={reportType} />
+            </div>
+        );
+    }
+
+    if (reportType === 'deepAnalysis') {
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
+                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
+                <DeepAnalysisReportView data={rawData} reportType={reportType} />
+            </div>
+        );
+    }
+    
+    if (reportType === 'daypartAnalysis') {
+        // Daypart analysis can use similar structure to spotlist but with different focus
+        // For now, render with daypart emphasis
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
+                <div className="card">
+                    <h2>Daypart Analysis Report</h2>
+                    <p style={{ color: 'var(--text-secondary)' }}>
+                        Performance analysis by time of day segments
+                    </p>
+                </div>
+                {fieldMap?.daypart_column && (
+                    <div className="card">
+                        <h3 style={{ marginBottom: '24px' }}>Performance by Daypart</h3>
+                        <DaypartAnalysis
+                            data={filteredData || rawData}
+                            daypartField={fieldMap.daypart_column}
+                            costField={fieldMap.cost_column}
+                            xrpField={fieldMap.xrp_column}
+                            reachField={fieldMap.reach_column}
+                        />
+                    </div>
+                )}
+                {rawData && rawData.length > 0 && (
+                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
+                            <h3 style={{ margin: 0 }}>Daypart Data</h3>
+                        </div>
+                        <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-secondary)', zIndex: 10 }}>
+                                    <tr>
+                                        {Object.keys(rawData[0]).map(key => (
+                                            <th key={key} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, fontSize: 'var(--font-size-sm)', borderBottom: '2px solid var(--border-color)' }}>
+                                                {key}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rawData.slice(0, 100).map((row, index) => (
+                                        <tr key={index} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                                            {Object.keys(rawData[0]).map(key => (
+                                                <td key={key} style={{ padding: '12px 16px', fontSize: 'var(--font-size-sm)' }}>
+                                                    {row[key] !== null && row[key] !== undefined ? String(row[key]) : '-'}
+                                                </td>
+                                            ))}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    // Default: Spotlist Report View
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            {/* Dashboard Overview - Quick Stats */}
+            <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
+            
             {/* AI Insights */}
             <AIInsights metrics={metrics} />
 
-            {/* Summary Metrics */}
+            {/* Legacy Summary Metrics (kept for backward compatibility) */}
             <div className="grid grid-cols-4" style={{ gap: '24px' }}>
                 <MetricsCard
                     title="Total Spend"

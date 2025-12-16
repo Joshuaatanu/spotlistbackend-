@@ -161,7 +161,6 @@ export default function FileUpload({ file, setFile }) {
                     fontSize: 'var(--font-size-lg)',
                     fontWeight: 600,
                     color: 'var(--text-primary)',
-                    marginBottom: 'var(--space-s)',
                     margin: 0,
                     marginBottom: 'var(--space-s)'
                 }}>
