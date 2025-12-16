@@ -1,7 +1,7 @@
 import io
 import sys
 from datetime import date, datetime, time
-from typing import Any, Optional
+from typing import Any, Optional, List
 from pathlib import Path
 
 import pandas as pd
