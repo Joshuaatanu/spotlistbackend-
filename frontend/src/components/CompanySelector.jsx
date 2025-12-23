@@ -3,7 +3,7 @@ import { Building2, Search } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
 
-export default function CompanySelector({ companyName, setCompanyName }) {
+export default function CompanySelector({ companyName, setCompanyName, setCompanyId }) {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -64,7 +64,11 @@ export default function CompanySelector({ companyName, setCompanyName }) {
 
     const handleSelectCompany = (company) => {
         const name = company.caption || company.name || company.label || '';
+        const id = company.value || company.id;
         setCompanyName(name);
+        if (setCompanyId) {
+            setCompanyId(id);
+        }
         setIsOpen(false);
         setSearchQuery('');
     };
@@ -294,4 +298,6 @@ export default function CompanySelector({ companyName, setCompanyName }) {
         </div>
     );
 }
+
+
 

@@ -87,14 +87,43 @@ export async function enrichDataItem(item, options = {}) {
     const enriched = { ...item };
 
     // Enrich channel IDs
-    if (enrichChannels && (item.channel_id !== undefined || item.channelId !== undefined)) {
+    if (enrichChannels) {
         const channels = await fetchMetadata('channels');
         if (channels) {
             const channelMap = createLookupMap(channels);
-            const channelId = String(item.channel_id || item.channelId || '');
-            if (channelMap[channelId]) {
+            // Try multiple field name variations for channel ID
+            const channelId = String(
+                item.channel_id || 
+                item.channelId || 
+                item.Channel_ID ||
+                item['Channel ID'] ||
+                ''
+            );
+            
+            if (channelId && channelId !== '' && channelMap[channelId]) {
                 enriched.channel_name = channelMap[channelId];
                 enriched.channel_display = channelMap[channelId];
+            } else {
+                // Try to match by name if ID not found
+                const channelName = item.channel || 
+                                   item.Channel || 
+                                   item.program_original || 
+                                   item.program_norm ||
+                                   '';
+                
+                if (channelName) {
+                    const matchingChannel = channels.find(ch => {
+                        const chName = ch.caption || ch.name || ch.label || '';
+                        return chName.toLowerCase() === String(channelName).toLowerCase();
+                    });
+                    
+                    if (matchingChannel) {
+                        enriched.channel_name = matchingChannel.caption || matchingChannel.name;
+                        enriched.channel_display = enriched.channel_name;
+                    } else {
+                        enriched.channel_display = channelName;
+                    }
+                }
             }
         }
     }
@@ -195,13 +224,47 @@ export async function enrichDataArray(data, options = {}) {
 
         // Enrich channels
         if (options.enrichChannels !== false) {
-            const channelId = String(item.channel_id || item.channelId || item.channel || '');
-            if (channelMap[channelId]) {
+            // Try multiple field name variations
+            const channelId = String(
+                item.channel_id || 
+                item.channelId || 
+                item.channel_id || 
+                item.Channel_ID ||
+                item['Channel ID'] ||
+                ''
+            );
+            
+            // Try to find by ID first
+            if (channelId && channelId !== '' && channelMap[channelId]) {
                 enriched.channel_name = channelMap[channelId];
                 enriched.channel_display = channelMap[channelId];
-            } else if (item.channel && !item.channel_name) {
-                // If channel is already a name, keep it
-                enriched.channel_display = item.channel;
+            } else {
+                // If no ID found, try to match by name
+                const channelName = item.channel || 
+                                   item.Channel || 
+                                   item.program_original || 
+                                   item.program_norm ||
+                                   item['Channel'] ||
+                                   '';
+                
+                if (channelName) {
+                    // Try to find exact match in channel names
+                    const matchingChannel = channels?.find(ch => {
+                        const chName = ch.caption || ch.name || ch.label || '';
+                        return chName.toLowerCase() === String(channelName).toLowerCase();
+                    });
+                    
+                    if (matchingChannel) {
+                        enriched.channel_name = matchingChannel.caption || matchingChannel.name;
+                        enriched.channel_display = enriched.channel_name;
+                    } else {
+                        // If it's already a readable name, use it
+                        enriched.channel_display = channelName;
+                    }
+                } else {
+                    // No channel info found
+                    enriched.channel_display = 'N/A';
+                }
             }
         }
 
@@ -279,3 +342,6 @@ export function clearMetadataCache() {
     });
     metadataCache.lastFetch = null;
 }
+
+
+

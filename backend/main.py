@@ -409,6 +409,117 @@ async def get_companies(filter_text: str = ""):
         traceback.print_exc()
         return []
 
+
+@app.get("/metadata/brands")
+async def get_brands(company_ids: str = "", filter_text: str = ""):
+    """Get available brands for given company IDs.
+    
+    Args:
+        company_ids: Comma-separated list of company IDs (e.g., "1,2,3")
+        filter_text: Optional text filter for brand names
+    """
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        from aeos_metadata import AEOSMetadata
+        metadata = AEOSMetadata(client)
+        
+        # Parse company IDs from comma-separated string
+        company_id_list = []
+        if company_ids:
+            try:
+                company_id_list = [int(id.strip()) for id in company_ids.split(',') if id.strip()]
+            except ValueError:
+                pass
+        
+        if not company_id_list:
+            return []
+        
+        # Get brands for the specified companies
+        brands = await loop.run_in_executor(
+            None, 
+            lambda: metadata.get_brands(company_id_list, filter_text=filter_text)
+        )
+        
+        # Normalize response format
+        if isinstance(brands, list):
+            return brands
+        elif isinstance(brands, dict) and "all" in brands:
+            return brands["all"]
+        return []
+    except Exception as e:
+        print(f"Error fetching brands: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
+
+@app.get("/metadata/products")
+async def get_products(brand_ids: str = "", company_id: str = "", filter_text: str = ""):
+    """Get available products for given brand IDs or company ID.
+    
+    Args:
+        brand_ids: Comma-separated list of brand IDs (e.g., "1,2,3")
+        company_id: Optional company ID - if provided, will fetch all brands for company first, then all products
+        filter_text: Optional text filter for product names
+    """
+    if not AEOS_AVAILABLE:
+        return []
+    try:
+        loop = asyncio.get_event_loop()
+        client = await loop.run_in_executor(None, AEOSClient)
+        from aeos_metadata import AEOSMetadata
+        metadata = AEOSMetadata(client)
+        
+        # If company_id is provided, get all brands for that company first
+        brand_id_list = []
+        if company_id:
+            try:
+                company_id_int = int(company_id.strip())
+                # Get all brands for this company
+                brands = await loop.run_in_executor(
+                    None,
+                    lambda: metadata.get_brands([company_id_int], filter_text="")
+                )
+                # Extract brand IDs
+                if isinstance(brands, list):
+                    brand_id_list = [b.get("value") or b.get("id") for b in brands if b.get("value") or b.get("id")]
+                elif isinstance(brands, dict) and "all" in brands:
+                    brand_id_list = [b.get("value") or b.get("id") for b in brands["all"] if b.get("value") or b.get("id")]
+            except (ValueError, Exception) as e:
+                print(f"Error fetching brands for company {company_id}: {e}")
+                return []
+        else:
+            # Parse brand IDs from comma-separated string
+            if brand_ids:
+                try:
+                    brand_id_list = [int(id.strip()) for id in brand_ids.split(',') if id.strip()]
+                except ValueError:
+                    pass
+        
+        if not brand_id_list:
+            return []
+        
+        # Get products for the specified brands
+        products = await loop.run_in_executor(
+            None,
+            lambda: metadata.get_products(brand_id_list, filter_text=filter_text)
+        )
+        
+        # Normalize response format
+        if isinstance(products, list):
+            return products
+        elif isinstance(products, dict) and "all" in products:
+            return products["all"]
+        return []
+    except Exception as e:
+        print(f"Error fetching products: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
+
 @app.post("/analyze")
 async def analyze_spotlist(
     file: UploadFile = File(...),
@@ -627,6 +738,8 @@ async def stream_progress_updates(
     dayparts: Optional[List[str]] = None,  # Daypart values like "6 - 9" (not IDs)
     epg_categories: Optional[List[int]] = None,
     profiles: Optional[List[int]] = None,
+    brand_ids: Optional[List[int]] = None,
+    product_ids: Optional[List[int]] = None,
 ) -> AsyncGenerator[str, None]:
     """Generator that yields progress updates as SSE events"""
     
@@ -999,45 +1112,94 @@ async def stream_progress_updates(
                 # Use enhanced spotlist with filters if available
                 loop = asyncio.get_event_loop()
                 
-                # Check if we should use enhanced filtering
-                if dayparts or weekdays or epg_categories:
+                # Check if we should use enhanced filtering (including brand/product filters)
+                # Use enhanced filtering if any advanced filters are provided OR if brand/product IDs are specified
+                if dayparts or weekdays or epg_categories or brand_ids or product_ids:
                     # Use enhanced spotlist report with filters
                     from report_types import EnhancedSpotlistReport
                     enhanced_spotlist = EnhancedSpotlistReport(client)
-                    report_rows = await loop.run_in_executor(
-                        None,
-                        enhanced_spotlist.get_spotlist,
-                        date_from,
-                        date_to,
-                        [channel_id],
-                        None,  # company_ids
-                        None,  # brand_ids
-                        None,  # product_ids
-                        None,  # industry_ids
-                        None,  # category_ids
-                        None,  # subcategory_ids
-                        dayparts,
-                        weekdays,
-                        epg_categories,
-                        True,  # use_medium_report
-                        5,     # poll_interval
-                        600,   # timeout
-                    )
-                    # Convert rows to report format
-                    if report_rows:
-                        rows = report_rows
-                    else:
+                    
+                    # Get company ID if company name is provided
+                    company_ids_for_filter = None
+                    if company_name:
+                        from aeos_metadata import AEOSMetadata
+                        metadata = AEOSMetadata(client)
+                        company_obj = await loop.run_in_executor(None, metadata.find_company, company_name)
+                        if company_obj:
+                            company_ids_for_filter = [company_obj.get("value") or company_obj.get("id")]
+                    
+                    # Use asyncio timeout to prevent hanging on individual channels
+                    try:
+                        report_rows = await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None,
+                                enhanced_spotlist.get_spotlist,
+                                date_from,
+                                date_to,
+                                [channel_id],
+                                company_ids_for_filter,  # company_ids
+                                brand_ids,  # brand_ids
+                                product_ids,  # product_ids
+                                None,  # industry_ids
+                                None,  # category_ids
+                                None,  # subcategory_ids
+                                dayparts,
+                                weekdays,
+                                epg_categories,
+                                True,  # use_medium_report
+                                5,     # poll_interval
+                                300,   # timeout - reduced from 600 to 300 seconds per channel
+                            ),
+                            timeout=310.0  # Slightly longer than the API timeout
+                        )
+                        # Convert rows to report format
+                        if report_rows:
+                            rows = report_rows
+                        else:
+                            rows = []
+                    except asyncio.TimeoutError:
+                        yield send_progress(
+                            int(progress),
+                            f"⏱ Timeout waiting for {channel_caption} (moving to next channel)...",
+                            "warning"
+                        )
+                        rows = []
+                    except Exception as api_error:
+                        yield send_progress(
+                            int(progress),
+                            f"⚠ API error for {channel_caption}: {str(api_error)[:50]} (moving to next channel)...",
+                            "warning"
+                        )
                         rows = []
                 else:
-                    # Use standard spotlist
-                    report = await loop.run_in_executor(
-                        None,
-                        checker.get_spotlist,
-                        channel_id,
-                        date_from,
-                        date_to,
-                    )
-                    rows = flatten_spotlist_report(report)
+                    # Use standard spotlist (only when no advanced filters are used)
+                    # Also add timeout protection for standard spotlist
+                    try:
+                        report = await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None,
+                                checker.get_spotlist,
+                                channel_id,
+                                date_from,
+                                date_to,
+                            ),
+                            timeout=300.0  # 5 minute timeout per channel
+                        )
+                        rows = flatten_spotlist_report(report)
+                    except asyncio.TimeoutError:
+                        yield send_progress(
+                            int(progress),
+                            f"⏱ Timeout waiting for {channel_caption} (moving to next channel)...",
+                            "warning"
+                        )
+                        rows = []
+                    except Exception as api_error:
+                        yield send_progress(
+                            int(progress),
+                            f"⚠ API error for {channel_caption}: {str(api_error)[:50]} (moving to next channel)...",
+                            "warning"
+                        )
+                        rows = []
                 
                 yield send_progress(
                     int(progress + 2),
@@ -1046,16 +1208,31 @@ async def stream_progress_updates(
                 )
                 
                 if not rows:
+                    yield send_progress(
+                        int(progress + 1),
+                        f"ℹ No spots found on {channel_caption} (moving to next channel)...",
+                        "info"
+                    )
                     continue
                 
-                # Filter by company name
+                # Filter by company name (only if not using enhanced filtering with company_ids)
+                # When using enhanced filtering with brand/product IDs, the API already filters by company
                 channel_matches = 0
                 for r in rows:
-                    company = str(r.get("Company") or r.get("Kunde") or "").lower()
-                    if target in company:
+                    # If using enhanced filtering with company_ids, brand_ids, or product_ids, 
+                    # the API already filtered, so we don't need to filter again by company name
+                    if brand_ids or product_ids or (dayparts or weekdays or epg_categories):
+                        # Enhanced filtering already applied - just add channel info
                         r["Channel"] = channel_caption
                         all_rows.append(r)
                         channel_matches += 1
+                    else:
+                        # Standard filtering - filter by company name substring
+                        company = str(r.get("Company") or r.get("Kunde") or "").lower()
+                        if target in company:
+                            r["Channel"] = channel_caption
+                            all_rows.append(r)
+                            channel_matches += 1
                 
                 if channel_matches > 0:
                     channels_with_data += 1
@@ -1151,6 +1328,8 @@ async def analyze_from_aeos(
     dayparts: str = Form(""),
     epg_categories: str = Form(""),
     profiles: str = Form(""),
+    brand_ids: str = Form(""),  # Optional - comma-separated or JSON array of brand IDs
+    product_ids: str = Form(""),  # Optional - comma-separated or JSON array of product IDs
 ):
     """
     Fetch spotlist data from AEOS API by company name and date range,
@@ -1165,6 +1344,8 @@ async def analyze_from_aeos(
     dayparts_list = None
     epg_categories_list = None
     profiles_list = None
+    brand_ids_list = None
+    product_ids_list = None
     
     try:
         if weekdays:
@@ -1175,6 +1356,10 @@ async def analyze_from_aeos(
             epg_categories_list = json.loads(epg_categories)
         if profiles:
             profiles_list = json.loads(profiles)
+        if brand_ids:
+            brand_ids_list = json.loads(brand_ids)
+        if product_ids:
+            product_ids_list = json.loads(product_ids)
     except json.JSONDecodeError:
         pass  # Use None if parsing fails
     
@@ -1193,6 +1378,8 @@ async def analyze_from_aeos(
             dayparts=dayparts_list,
             epg_categories=epg_categories_list,
             profiles=profiles_list,
+            brand_ids=brand_ids_list,
+            product_ids=product_ids_list,
         ),
         media_type="text/event-stream",
         headers={

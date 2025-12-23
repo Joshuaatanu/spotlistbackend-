@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Upload, FileText, Clock, Settings, Database, Download, Activity } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
@@ -14,6 +14,17 @@ function App() {
   const [dataSource, setDataSource] = useState('file'); // 'file' or 'aeos'
   const [file, setFile] = useState(null);
   const [companyName, setCompanyName] = useState('');
+  const [companyId, setCompanyId] = useState(null);
+  const [brandIds, setBrandIds] = useState([]);
+  const [productIds, setProductIds] = useState([]);
+
+  // Reset brand and product selections when company changes
+  useEffect(() => {
+    if (!companyId) {
+      setBrandIds([]);
+      setProductIds([]);
+    }
+  }, [companyId]);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [channelFilter, setChannelFilter] = useState('');
@@ -91,6 +102,14 @@ function App() {
     formData.append('channel_filter', channelFilter || '');
     // Add Top Ten subtype (always send, defaults to 'spots' if not Top Ten)
     formData.append('top_ten_subtype', reportType === 'topTen' ? (topTenSubtype || 'spots') : 'spots');
+    
+    // Add brand and product IDs (for spotlist reports)
+    if (reportType === 'spotlist' && brandIds && brandIds.length > 0) {
+      formData.append('brand_ids', JSON.stringify(brandIds));
+    }
+    if (reportType === 'spotlist' && productIds && productIds.length > 0) {
+      formData.append('product_ids', JSON.stringify(productIds));
+    }
     
     // Add enhanced filters
     if (filters.weekdays && filters.weekdays.length > 0) {
@@ -377,6 +396,12 @@ function App() {
                       <AeosDataFetch
                         companyName={companyName}
                         setCompanyName={setCompanyName}
+                        companyId={companyId}
+                        setCompanyId={setCompanyId}
+                        brandIds={brandIds}
+                        setBrandIds={setBrandIds}
+                        productIds={productIds}
+                        setProductIds={setProductIds}
                         dateFrom={dateFrom}
                         setDateFrom={setDateFrom}
                         dateTo={dateTo}

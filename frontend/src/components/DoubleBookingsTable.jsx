@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Filter, X } from 'lucide-react';
+import { getDisplayName } from '../utils/metadataEnricher';
 
 export default function DoubleBookingsTable({ data, fieldMap }) {
     const [sortColumn, setSortColumn] = useState(null);
@@ -20,14 +21,25 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
         );
     }
 
-    // Get unique channels for filter
-    const channels = [...new Set(data.map(item => 
-        item[fieldMap?.program_column] || item.program_original || item.program_norm || 'Unknown'
-    ))].sort();
+    // Get unique channels for filter (use enriched names if available)
+    const channels = [...new Set(data.map(item => {
+        const channel = getDisplayName(item, 'channel') || 
+                       item[fieldMap?.program_column] || 
+                       item.program_original || 
+                       item.program_norm || 
+                       item.channel_display ||
+                       'Unknown';
+        return channel;
+    }))].sort();
 
-    // Filter data
+    // Filter data (use enriched names if available)
     let filteredData = data.filter(item => {
-        const channel = item[fieldMap?.program_column] || item.program_original || item.program_norm || 'Unknown';
+        const channel = getDisplayName(item, 'channel') || 
+                       item[fieldMap?.program_column] || 
+                       item.program_original || 
+                       item.program_norm || 
+                       item.channel_display ||
+                       'Unknown';
         const date = item.timestamp ? item.timestamp.split('T')[0] : '';
         
         if (filterChannel && channel !== filterChannel) return false;
@@ -109,7 +121,13 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
     };
 
     const getChannel = (item) => {
-        return item[fieldMap?.program_column] || item.program_original || item.program_norm || item.Channel || 'Unknown';
+        return getDisplayName(item, 'channel') || 
+               item[fieldMap?.program_column] || 
+               item.program_original || 
+               item.program_norm || 
+               item.Channel || 
+               item.channel_display ||
+               'Unknown';
     };
 
     const getCreative = (item) => {

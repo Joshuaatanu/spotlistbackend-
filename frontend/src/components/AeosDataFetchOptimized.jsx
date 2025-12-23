@@ -3,6 +3,8 @@ import { Database, Calendar, Building2, Info, AlertCircle, CheckCircle2, BarChar
 import ReportTypeSelector from './ReportTypeSelector';
 import EnhancedFilters from './EnhancedFilters';
 import CompanySelector from './CompanySelector';
+import BrandSelector from './BrandSelector';
+import ProductSelector from './ProductSelector';
 
 // Report-specific parameter configurations
 const REPORT_CONFIGS = {
@@ -90,6 +92,12 @@ const REPORT_CONFIGS = {
 export default function AeosDataFetchOptimized({
     companyName,
     setCompanyName,
+    companyId,
+    setCompanyId,
+    brandIds,
+    setBrandIds,
+    productIds,
+    setProductIds,
     dateFrom,
     setDateFrom,
     dateTo,
@@ -318,6 +326,7 @@ export default function AeosDataFetchOptimized({
                     <CompanySelector
                         companyName={companyName}
                         setCompanyName={setCompanyName}
+                        setCompanyId={setCompanyId}
                     />
                     {reportConfig.requiredParams.includes('companyName') && (
                         <p style={{
@@ -329,6 +338,30 @@ export default function AeosDataFetchOptimized({
                             * Required for this report type
                         </p>
                     )}
+                </div>
+            )}
+
+            {/* Brand Selector - Only for spotlist reports */}
+            {reportType === 'spotlist' && companyId && (
+                <div style={{ marginTop: 'var(--space-m)' }}>
+                    <BrandSelector
+                        companyId={companyId}
+                        brandIds={brandIds}
+                        setBrandIds={setBrandIds}
+                    />
+                </div>
+            )}
+
+            {/* Product Selector - Only for spotlist reports */}
+            {/* Show if brands are selected OR if company is selected (to show all products) */}
+            {reportType === 'spotlist' && ((brandIds && brandIds.length > 0) || companyId) && (
+                <div style={{ marginTop: 'var(--space-m)' }}>
+                    <ProductSelector
+                        brandIds={brandIds}
+                        companyId={companyId}
+                        productIds={productIds}
+                        setProductIds={setProductIds}
+                    />
                 </div>
             )}
 
