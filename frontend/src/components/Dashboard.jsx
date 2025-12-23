@@ -13,6 +13,14 @@ import ReachFrequencyReportView from './ReachFrequencyReportView';
 import DeepAnalysisReportView from './DeepAnalysisReportView';
 import DashboardOverview from './DashboardOverview';
 import { enrichDataArray, initializeMetadata } from '../utils/metadataEnricher';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { DashboardSkeleton } from './DashboardSkeleton';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { KeyboardShortcutsHelp, KeyboardShortcutsButton } from './KeyboardShortcutsHelp';
+import { FullscreenChart } from './FullscreenChart';
 
 export default function Dashboard({ data }) {
     const { metrics, window_summaries, data: rawData, field_map: fieldMap, metadata } = data || {};
@@ -20,15 +28,22 @@ export default function Dashboard({ data }) {
     const [filteredData, setFilteredData] = useState(null);
     const [enrichedData, setEnrichedData] = useState(null);
     const [enrichmentLoading, setEnrichmentLoading] = useState(false);
-    
-    // Initialize metadata on component mount
+    const [showShortcuts, setShowShortcuts] = useState(false);
+    const [filtersExpanded, setFiltersExpanded] = useState(false);
+
+    // Keyboard shortcuts
+    useKeyboardShortcuts({
+        'f': () => setFiltersExpanded(prev => !prev),
+        '?': () => setShowShortcuts(true),
+        'escape': () => { setShowShortcuts(false); },
+    });
+
     useEffect(() => {
         initializeMetadata().catch(err => {
             console.warn('Failed to initialize metadata cache:', err);
         });
     }, []);
 
-    // Enrich data when rawData changes
     useEffect(() => {
         if (!rawData || !Array.isArray(rawData) || rawData.length === 0) {
             setEnrichedData(null);
@@ -46,87 +61,41 @@ export default function Dashboard({ data }) {
             .then(enriched => {
                 setEnrichedData(enriched);
                 setEnrichmentLoading(false);
-                // Debug: log first item to see what fields are available
-                if (enriched && enriched.length > 0) {
-                    console.log('Sample enriched item:', enriched[0]);
-                    console.log('Channel fields:', {
-                        channel: enriched[0].channel,
-                        Channel: enriched[0].Channel,
-                        channel_id: enriched[0].channel_id,
-                        channel_display: enriched[0].channel_display,
-                        program_original: enriched[0].program_original
-                    });
-                }
             })
             .catch(err => {
                 console.error('Failed to enrich data:', err);
-                // Fallback to raw data if enrichment fails
                 setEnrichedData(rawData);
                 setEnrichmentLoading(false);
             });
     }, [rawData]);
 
-    // Use enriched data if available, otherwise fall back to raw data
     const displayData = enrichedData || rawData;
 
-    // Detect report type from metadata or data structure
     const reportType = useMemo(() => {
-        // Check metadata first
-        if (metadata?.report_type) {
-            return metadata.report_type;
-        }
-        
-        // Check data structure to infer report type
-        if (!displayData || !Array.isArray(displayData) || displayData.length === 0) {
-            return 'spotlist'; // Default
-        }
-        
+        if (metadata?.report_type) return metadata.report_type;
+        if (!displayData || !Array.isArray(displayData) || displayData.length === 0) return 'spotlist';
+
         const firstItem = displayData[0];
         const keys = Object.keys(firstItem);
-        
-        // Check for Top Ten indicators (ranking, top entities)
-        if (keys.some(k => k.toLowerCase().includes('rank')) || 
-            keys.some(k => k.toLowerCase().includes('top'))) {
-            return 'topTen';
-        }
-        
-        // Check for Reach & Frequency indicators
+
+        if (keys.some(k => k.toLowerCase().includes('rank'))) return 'topTen';
         if (keys.some(k => k.toLowerCase().includes('frequency')) &&
-            keys.some(k => k.toLowerCase().includes('reach'))) {
-            return 'reachFrequency';
-        }
-        
-        // Check for Deep Analysis KPIs
-        if (keys.some(k => ['amr-perc', 'amr_perc', 'share', 'ats-avg', 'atv-avg'].includes(k.toLowerCase())) ||
-            keys.some(k => k.toLowerCase().includes('amr')) ||
-            keys.some(k => k.toLowerCase().includes('share'))) {
-            return 'deepAnalysis';
-        }
-        
-        // Check for daypart analysis structure
+            keys.some(k => k.toLowerCase().includes('reach'))) return 'reachFrequency';
+        if (keys.some(k => ['amr-perc', 'amr_perc', 'share'].includes(k.toLowerCase()))) return 'deepAnalysis';
         if (keys.some(k => k.toLowerCase().includes('daypart')) &&
-            !keys.some(k => k.toLowerCase().includes('is_double'))) {
-            return 'daypartAnalysis';
-        }
-        
-        // Default to spotlist (has is_double, cost, etc.)
+            !keys.some(k => k.toLowerCase().includes('is_double'))) return 'daypartAnalysis';
+
         return 'spotlist';
     }, [metadata, displayData]);
-    
-    // Use 120-minute window metrics by default (matching personal analysis)
+
     const displayMetrics = useMemo(() => {
         if (window_summaries && window_summaries.length > 0) {
-            // Find 120-minute window summary
             const window120 = window_summaries.find(w => w.window_minutes === 120);
-            if (window120 && window120.all) {
-                return window120.all;
-            }
+            if (window120 && window120.all) return window120.all;
         }
-        // Fallback to default metrics if 120-minute not found
         return metrics;
     }, [window_summaries, metrics]);
 
-    // Prepare data for table (memoized)
     const allTable = useMemo(() => {
         return window_summaries.map(w => {
             const m = w.all;
@@ -141,7 +110,6 @@ export default function Dashboard({ data }) {
         }).filter(Boolean);
     }, [window_summaries]);
 
-    // Apply filters function (memoized)
     const applyFilters = useCallback((filterConfig) => {
         setFilters(filterConfig);
         if (!filterConfig || !displayData) {
@@ -151,15 +119,13 @@ export default function Dashboard({ data }) {
 
         let filtered = [...displayData];
 
-        // Channel filter
-        if (filterConfig.channels && filterConfig.channels.length > 0) {
+        if (filterConfig.channels?.length > 0) {
             filtered = filtered.filter(d => {
                 const channel = d[fieldMap?.program_column] || d.Channel || d.program_original;
                 return filterConfig.channels.includes(channel);
             });
         }
 
-        // Date range filter
         if (filterConfig.dates) {
             if (filterConfig.dates.start) {
                 filtered = filtered.filter(d => {
@@ -175,28 +141,24 @@ export default function Dashboard({ data }) {
             }
         }
 
-        // Daypart filter
-        if (filterConfig.dayparts && filterConfig.dayparts.length > 0) {
+        if (filterConfig.dayparts?.length > 0) {
             filtered = filtered.filter(d => {
                 const daypart = d[fieldMap?.daypart_column] || d['Airing daypart'];
                 return filterConfig.dayparts.includes(daypart);
             });
         }
 
-        // Category filter
-        if (filterConfig.categories && filterConfig.categories.length > 0) {
+        if (filterConfig.categories?.length > 0) {
             filtered = filtered.filter(d => {
                 const category = d[fieldMap?.epg_category_column] || d['EPG category'];
                 return filterConfig.categories.includes(category);
             });
         }
 
-        // Brand filter
-        if (filterConfig.brands && filterConfig.brands.length > 0) {
+        if (filterConfig.brands?.length > 0) {
             filtered = filtered.filter(d => filterConfig.brands.includes(d.Brand));
         }
 
-        // Placement filter
         if (filterConfig.placement) {
             filtered = filtered.filter(d => {
                 const placement = d['Before / Within content'] || d.Placement;
@@ -204,7 +166,6 @@ export default function Dashboard({ data }) {
             });
         }
 
-        // Spend range filter
         if (filterConfig.minSpend) {
             filtered = filtered.filter(d => {
                 const spend = d.cost_numeric || d[fieldMap?.cost_column] || d.Spend || 0;
@@ -218,24 +179,9 @@ export default function Dashboard({ data }) {
             });
         }
 
-        // Duration range filter
-        if (filterConfig.minDuration && fieldMap?.duration_column) {
-            filtered = filtered.filter(d => {
-                const duration = parseFloat(d[fieldMap.duration_column] || d.Duration || 0);
-                return duration >= parseFloat(filterConfig.minDuration);
-            });
-        }
-        if (filterConfig.maxDuration && fieldMap?.duration_column) {
-            filtered = filtered.filter(d => {
-                const duration = parseFloat(d[fieldMap.duration_column] || d.Duration || 0);
-                return duration <= parseFloat(filterConfig.maxDuration);
-            });
-        }
-
         setFilteredData(filtered);
     }, [displayData, fieldMap]);
 
-    // Filter displayData for double bookings only for the charts (memoized)
     const dataToUse = filteredData || displayData;
     const doubleBookings = useMemo(() => {
         return dataToUse.filter(r => r.is_double);
@@ -243,28 +189,19 @@ export default function Dashboard({ data }) {
 
     const downloadFilteredCSV = async () => {
         const dataToExport = filteredData || displayData;
-        if (!dataToExport || !dataToExport.length) return;
+        if (!dataToExport?.length) return;
 
-        // Create a new workbook and worksheet
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Spotlist Data');
 
-        // Get headers from the first row
         const headers = Object.keys(dataToExport[0]);
-        
-        // Add header row with styling
         const headerRow = worksheet.addRow(headers);
         headerRow.font = { bold: true, size: 11 };
-        headerRow.fill = {
-            type: 'pattern',
-            pattern: 'solid',
-            fgColor: { argb: 'FFE5E7EB' } // Light gray background
-        };
+        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
         headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
         headerRow.height = 20;
 
-        // Style header cells
-        headerRow.eachCell((cell, colNumber) => {
+        headerRow.eachCell((cell) => {
             cell.border = {
                 top: { style: 'thin' },
                 left: { style: 'thin' },
@@ -273,30 +210,16 @@ export default function Dashboard({ data }) {
             };
         });
 
-        // Add data rows with conditional highlighting for double bookings
         dataToExport.forEach((row) => {
-            const rowData = headers.map(header => {
-                let val = row[header];
-                if (val === null || val === undefined) return '';
-                return val;
-            });
-            
+            const rowData = headers.map(header => row[header] ?? '');
             const excelRow = worksheet.addRow(rowData);
-            
-            // Check if this row is a double booking
             const isDouble = row.is_double === true || row.is_double === 'true' || row.is_double === 1;
-            
+
             if (isDouble) {
-                // Highlight double booking rows with light red background
-                excelRow.fill = {
-                    type: 'pattern',
-                    pattern: 'solid',
-                    fgColor: { argb: 'FFFFE5E5' } // Light red/pink background
-                };
-                excelRow.font = { color: { argb: 'FF991B1B' } }; // Dark red text
+                excelRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE5E5' } };
+                excelRow.font = { color: { argb: 'FF991B1B' } };
             }
 
-            // Add borders to all cells
             excelRow.eachCell((cell) => {
                 cell.border = {
                     top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
@@ -308,29 +231,20 @@ export default function Dashboard({ data }) {
             });
         });
 
-        // Auto-fit column widths
         worksheet.columns.forEach((column) => {
             let maxLength = 10;
             column.eachCell({ includeEmpty: false }, (cell) => {
                 const cellValue = cell.value ? cell.value.toString() : '';
-                if (cellValue.length > maxLength) {
-                    maxLength = cellValue.length;
-                }
+                if (cellValue.length > maxLength) maxLength = cellValue.length;
             });
-            column.width = Math.min(maxLength + 2, 50); // Cap at 50 characters
+            column.width = Math.min(maxLength + 2, 50);
         });
 
-        // Freeze the header row
-        worksheet.views = [
-            { state: 'frozen', ySplit: 1 }
-        ];
+        worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
-        // Generate Excel file
         const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        });
-        
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
@@ -342,33 +256,16 @@ export default function Dashboard({ data }) {
         URL.revokeObjectURL(url);
     };
 
-    // Check if additional metrics are available
     const hasXRP = displayMetrics?.total_xrp !== undefined;
     const hasReach = displayMetrics?.total_reach !== undefined;
 
-    // Show loading state while enriching data
     if (enrichmentLoading && !displayData) {
-        return (
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                minHeight: '400px',
-                flexDirection: 'column',
-                gap: 'var(--space-m)'
-            }}>
-                <div className="loading-spinner" />
-                <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                    Enriching data with metadata...
-                </div>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
-    // Render report-type-specific views
     if (reportType === 'topTen') {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
+            <div className="flex flex-col gap-8">
                 <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
                 <TopTenReportView data={displayData} reportType={reportType} />
             </div>
@@ -377,7 +274,7 @@ export default function Dashboard({ data }) {
 
     if (reportType === 'reachFrequency') {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
+            <div className="flex flex-col gap-8">
                 <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
                 <ReachFrequencyReportView data={displayData || data} reportType={reportType} />
             </div>
@@ -386,83 +283,43 @@ export default function Dashboard({ data }) {
 
     if (reportType === 'deepAnalysis') {
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xl)' }}>
+            <div className="flex flex-col gap-8">
                 <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
                 <DeepAnalysisReportView data={displayData} reportType={reportType} />
             </div>
         );
     }
-    
+
     if (reportType === 'daypartAnalysis') {
-        // Daypart analysis can use similar structure to spotlist but with different focus
-        // For now, render with daypart emphasis
         return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div className="flex flex-col gap-8">
                 <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
-                <div className="card">
-                    <h2>Daypart Analysis Report</h2>
-                    <p style={{ color: 'var(--text-secondary)' }}>
-                        Performance analysis by time of day segments
-                    </p>
-                </div>
-                {fieldMap?.daypart_column && (
-                    <div className="card">
-                        <h3 style={{ marginBottom: '24px' }}>Performance by Daypart</h3>
-                        <DaypartAnalysis
-                            data={filteredData || displayData}
-                            daypartField={fieldMap.daypart_column}
-                            costField={fieldMap.cost_column}
-                            xrpField={fieldMap.xrp_column}
-                            reachField={fieldMap.reach_column}
-                        />
-                    </div>
-                )}
-                {displayData && displayData.length > 0 && (
-                    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                        <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                            <h3 style={{ margin: 0 }}>Daypart Data</h3>
-                        </div>
-                        <div style={{ overflowX: 'auto', maxHeight: '600px', overflowY: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead style={{ position: 'sticky', top: 0, backgroundColor: 'var(--bg-secondary)', zIndex: 10 }}>
-                                    <tr>
-                                        {Object.keys(displayData[0]).map(key => (
-                                            <th key={key} style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, fontSize: 'var(--font-size-sm)', borderBottom: '2px solid var(--border-color)' }}>
-                                                {key}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {displayData.slice(0, 100).map((row, index) => (
-                                        <tr key={index} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                                            {Object.keys(displayData[0]).map(key => (
-                                                <td key={key} style={{ padding: '12px 16px', fontSize: 'var(--font-size-sm)' }}>
-                                                    {row[key] !== null && row[key] !== undefined ? String(row[key]) : '-'}
-                                                </td>
-                                            ))}
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Daypart Analysis Report</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground">Performance analysis by time of day segments</p>
+                    </CardContent>
+                </Card>
             </div>
         );
     }
 
     // Default: Spotlist Report View
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Dashboard Overview - Quick Stats */}
+        <div className="flex flex-col gap-8">
+            {/* Keyboard Shortcuts Help Modal */}
+            <KeyboardShortcutsHelp open={showShortcuts} onOpenChange={setShowShortcuts} />
+
+            {/* Dashboard Overview */}
             <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
-            
+
             {/* AI Insights */}
             <AIInsights metrics={metrics} />
 
-            {/* Legacy Summary Metrics (kept for backward compatibility) */}
-            <div className="grid grid-cols-4" style={{ gap: '24px' }}>
+            {/* Summary Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <MetricsCard
                     title="Total Spend"
                     value={`€${displayMetrics.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -490,130 +347,54 @@ export default function Dashboard({ data }) {
             </div>
 
             {/* Duplicate Breakdown */}
-            <div className="card">
-                <h3 style={{ marginBottom: 'var(--space-l)' }}>
-                    Duplicate Booking Analysis
-                </h3>
-                <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
-                    gap: 'var(--space-xl)' 
-                }}>
-                    {/* Cost of Duplicate Bookings */}
-                    <div>
-                        <div style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            color: 'var(--text-secondary)',
-                            marginBottom: 'var(--space-s)'
-                        }}>
-                            Cost of Duplicate Bookings
-                        </div>
-                        <div style={{
-                            fontSize: 'var(--font-size-2xl)',
-                            fontWeight: 'var(--font-weight-bold)',
-                            color: 'var(--accent-error)',
-                            marginBottom: 'var(--space-xs)'
-                        }}>
-                            €{displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                    </div>
-
-                    {/* Percentage of Duplicate Bookings (% of costs) */}
-                    <div>
-                        <div style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            color: 'var(--text-secondary)',
-                            marginBottom: 'var(--space-s)'
-                        }}>
-                            Percentage of Duplicate Bookings
-                        </div>
-                        <div style={{
-                            fontSize: 'var(--font-size-2xl)',
-                            fontWeight: 'var(--font-weight-bold)',
-                            color: 'var(--accent-error)',
-                            marginBottom: 'var(--space-xs)'
-                        }}>
-                            {(displayMetrics.percent_cost * 100).toFixed(2)}%
-                        </div>
-                        <div style={{
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-tertiary)'
-                        }}>
-                            as % of costs
-                        </div>
-                    </div>
-
-                    {/* Total Number of Affected Spots */}
-                    <div>
-                        <div style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            color: 'var(--text-secondary)',
-                            marginBottom: 'var(--space-s)'
-                        }}>
-                            Total Number of Affected Spots
-                        </div>
-                        <div style={{
-                            fontSize: 'var(--font-size-2xl)',
-                            fontWeight: 'var(--font-weight-bold)',
-                            color: 'var(--accent-error)',
-                            marginBottom: 'var(--space-xs)'
-                        }}>
-                            {displayMetrics.double_spots.toLocaleString()}
-                        </div>
-                    </div>
-
-                    {/* Same Programme Duplicates */}
-                    {displayMetrics.same_sendung_spots !== undefined && (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Duplicate Booking Analysis</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                         <div>
-                            <div style={{
-                                fontSize: 'var(--font-size-sm)',
-                                fontWeight: 'var(--font-weight-semibold)',
-                                color: 'var(--text-secondary)',
-                                marginBottom: 'var(--space-s)'
-                            }}>
-                                Same Programme Duplicates
-                            </div>
-                            <div style={{
-                                fontSize: 'var(--font-size-2xl)',
-                                fontWeight: 'var(--font-weight-bold)',
-                                color: 'var(--accent-warning)',
-                                marginBottom: 'var(--space-xs)'
-                            }}>
-                                {displayMetrics.same_sendung_spots.toLocaleString()}
-                            </div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-2">Cost of Duplicates</p>
+                            <p className="text-2xl font-bold text-red-500">
+                                €{displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
                         </div>
-                    )}
-
-                    {/* Different Programme Duplicates */}
-                    {displayMetrics.diff_sendung_spots !== undefined && (
                         <div>
-                            <div style={{
-                                fontSize: 'var(--font-size-sm)',
-                                fontWeight: 'var(--font-weight-semibold)',
-                                color: 'var(--text-secondary)',
-                                marginBottom: 'var(--space-s)'
-                            }}>
-                                Different Programme Duplicates
-                            </div>
-                            <div style={{
-                                fontSize: 'var(--font-size-2xl)',
-                                fontWeight: 'var(--font-weight-bold)',
-                                color: 'var(--accent-error)',
-                                marginBottom: 'var(--space-xs)'
-                            }}>
-                                {displayMetrics.diff_sendung_spots.toLocaleString()}
-                            </div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-2">Percentage of Budget</p>
+                            <p className="text-2xl font-bold text-red-500">
+                                {(displayMetrics.percent_cost * 100).toFixed(2)}%
+                            </p>
+                            <p className="text-xs text-muted-foreground">as % of costs</p>
                         </div>
-                    )}
-                </div>
-            </div>
+                        <div>
+                            <p className="text-sm font-semibold text-muted-foreground mb-2">Affected Spots</p>
+                            <p className="text-2xl font-bold text-red-500">
+                                {displayMetrics.double_spots.toLocaleString()}
+                            </p>
+                        </div>
+                        {displayMetrics.same_sendung_spots !== undefined && (
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground mb-2">Same Programme</p>
+                                <p className="text-2xl font-bold text-amber-500">
+                                    {displayMetrics.same_sendung_spots.toLocaleString()}
+                                </p>
+                            </div>
+                        )}
+                        {displayMetrics.diff_sendung_spots !== undefined && (
+                            <div>
+                                <p className="text-sm font-semibold text-muted-foreground mb-2">Different Programme</p>
+                                <p className="text-2xl font-bold text-red-500">
+                                    {displayMetrics.diff_sendung_spots.toLocaleString()}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
 
-            {/* Additional Metrics (if available) */}
+            {/* Additional Metrics (XRP/Reach) */}
             {(hasXRP || hasReach) && (
-                <div className="grid grid-cols-4" style={{ gap: '24px' }}>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {hasXRP && (
                         <>
                             <MetricsCard
@@ -648,131 +429,122 @@ export default function Dashboard({ data }) {
                             />
                         </>
                     )}
-                    {metrics.cost_per_xrp !== undefined && (
-                        <MetricsCard
-                            title="Cost per XRP"
-                            value={`€${metrics.cost_per_xrp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                            icon={BarChart3}
-                        />
-                    )}
-                    {metrics.cost_per_reach !== undefined && (
-                        <MetricsCard
-                            title="Cost per Reach"
-                            value={`€${metrics.cost_per_reach.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                            icon={BarChart3}
-                        />
-                    )}
                 </div>
             )}
 
-            {/* Charts */}
-            <div className="grid grid-cols-1" style={{ gap: '32px' }}>
-                <div className="card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <h3 style={{ margin: 0 }}>
-                            Trend Activity
-                            {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}> (Filtered)</span>}
-                        </h3>
-                        <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', fontWeight: 'var(--font-weight-semibold)' }}>
-                            Last 30 Days
-                        </div>
-                    </div>
+            {/* Trend Activity Chart */}
+            <Card>
+                <CardHeader className="flex-row items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                        Trend Activity
+                        {filteredData && <Badge variant="secondary" className="text-xs">Filtered</Badge>}
+                    </CardTitle>
+                    <span className="text-xs text-muted-foreground font-semibold">Last 30 Days</span>
+                </CardHeader>
+                <CardContent>
                     <DoubleCountChart data={doubleBookings} programField={fieldMap?.program_column} />
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Advanced Filters */}
-            <AdvancedFilters 
-                data={displayData} 
+            <AdvancedFilters
+                data={displayData}
                 fieldMap={fieldMap}
                 onFilterChange={applyFilters}
             />
 
-
             {/* Additional Analysis Charts */}
             {(fieldMap?.daypart_column || fieldMap?.epg_category_column) && (
-                <div className="grid grid-cols-2" style={{ gap: '32px' }}>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {fieldMap?.daypart_column && (
-                        <div className="card">
-                            <h3 style={{ marginBottom: '24px' }}>
-                                Performance by Daypart
-                            </h3>
-                            <DaypartAnalysis
-                                data={filteredData || displayData}
-                                daypartField={fieldMap.daypart_column}
-                                costField={fieldMap.cost_column}
-                                xrpField={fieldMap.xrp_column}
-                                reachField={fieldMap.reach_column}
-                            />
-                        </div>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Performance by Daypart</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <DaypartAnalysis
+                                    data={filteredData || displayData}
+                                    daypartField={fieldMap.daypart_column}
+                                    costField={fieldMap.cost_column}
+                                    xrpField={fieldMap.xrp_column}
+                                    reachField={fieldMap.reach_column}
+                                />
+                            </CardContent>
+                        </Card>
                     )}
                     {fieldMap?.epg_category_column && (
-                        <div className="card">
-                            <h3 style={{ marginBottom: '24px' }}>
-                                Spend by EPG Category
-                            </h3>
-                            <EPGCategoryBreakdown
-                                data={filteredData || displayData}
-                                categoryField={fieldMap.epg_category_column}
-                                costField={fieldMap.cost_column}
-                            />
-                        </div>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Spend by EPG Category</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <EPGCategoryBreakdown
+                                    data={filteredData || displayData}
+                                    categoryField={fieldMap.epg_category_column}
+                                    costField={fieldMap.cost_column}
+                                />
+                            </CardContent>
+                        </Card>
                     )}
                 </div>
             )}
 
             {/* Channel Performance */}
             {fieldMap?.program_column && (
-                <div className="card">
-                    <h3 style={{ marginBottom: '24px' }}>
-                        Channel Performance & Efficiency
-                        {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}> (Filtered)</span>}
-                    </h3>
-                    <ChannelPerformance
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            Channel Performance & Efficiency
+                            {filteredData && <Badge variant="secondary" className="text-xs">Filtered</Badge>}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <ChannelPerformance
                             data={filteredData || displayData}
-                        programField={fieldMap.program_column}
-                        costField={fieldMap.cost_column}
-                        xrpField={fieldMap.xrp_column}
-                        reachField={fieldMap.reach_column}
-                    />
-                </div>
+                            programField={fieldMap.program_column}
+                            costField={fieldMap.cost_column}
+                            xrpField={fieldMap.xrp_column}
+                            reachField={fieldMap.reach_column}
+                        />
+                    </CardContent>
+                </Card>
             )}
 
             {/* Detailed Tables */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                        <h3 style={{ margin: 0, marginBottom: '4px' }}>
-                            Double Bookings by Time Window (All)
-                        </h3>
-                    </div>
+            <div className="flex flex-col gap-8">
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b">
+                        <CardTitle>Double Bookings by Time Window</CardTitle>
+                    </CardHeader>
                     <WindowTable summaries={allTable} />
-                </div>
+                </Card>
 
-                <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                    <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                        <h3 style={{ margin: 0, marginBottom: '4px' }}>
-                            Detailed Double Bookings {filteredData && <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 'var(--font-weight-normal)', color: 'var(--text-secondary)' }}>({doubleBookings.length} of {displayData.filter(r => r.is_double).length})</span>}
-                        </h3>
-                        <p style={{ 
-                            fontSize: '14px', 
-                            color: 'var(--text-secondary)', 
-                            margin: 0,
-                            marginTop: '4px'
-                        }}>
-                            Click on a row to view details. Use Advanced Filters above to narrow down results.
-                        </p>
-                    </div>
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 mb-1">
+                                Detailed Double Bookings
+                                {filteredData && (
+                                    <Badge variant="secondary" className="text-xs">
+                                        {doubleBookings.length} of {displayData.filter(r => r.is_double).length}
+                                    </Badge>
+                                )}
+                            </CardTitle>
+                            <p className="text-sm text-muted-foreground">
+                                Click on a row to view details. Use Advanced Filters above to narrow down results.
+                            </p>
+                        </div>
+                    </CardHeader>
                     <DoubleBookingsTable data={doubleBookings} fieldMap={fieldMap} />
-                </div>
+                </Card>
             </div>
 
             {/* Download Action */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button onClick={downloadFilteredCSV} className="btn">
-                    <Download size={20} />
+            <div className="flex justify-end">
+                <Button onClick={downloadFilteredCSV}>
+                    <Download className="size-5" />
                     {filters ? 'Export Filtered Excel' : 'Download Annotated Excel'}
-                </button>
+                </Button>
             </div>
         </div>
     );

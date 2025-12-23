@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Upload, FileText, Clock, Settings, Database, Download, Activity } from 'lucide-react';
+import { Upload, Database, Settings, Clock, FileText, Download, Activity } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
 import FileUpload from './components/FileUpload';
@@ -8,6 +8,14 @@ import ConfigPanel from './components/ConfigPanel';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Toaster } from '@/components/ui/toaster';
+import { cn } from '@/lib/utils';
 
 function App() {
   const [activeTab, setActiveTab] = useState('analyze');
@@ -102,7 +110,7 @@ function App() {
     formData.append('channel_filter', channelFilter || '');
     // Add Top Ten subtype (always send, defaults to 'spots' if not Top Ten)
     formData.append('top_ten_subtype', reportType === 'topTen' ? (topTenSubtype || 'spots') : 'spots');
-    
+
     // Add brand and product IDs (for spotlist reports)
     if (reportType === 'spotlist' && brandIds && brandIds.length > 0) {
       formData.append('brand_ids', JSON.stringify(brandIds));
@@ -110,7 +118,7 @@ function App() {
     if (reportType === 'spotlist' && productIds && productIds.length > 0) {
       formData.append('product_ids', JSON.stringify(productIds));
     }
-    
+
     // Add enhanced filters
     if (filters.weekdays && filters.weekdays.length > 0) {
       formData.append('weekdays', JSON.stringify(filters.weekdays));
@@ -124,7 +132,7 @@ function App() {
     if (filters.profiles && filters.profiles.length > 0) {
       formData.append('profiles', JSON.stringify(filters.profiles));
     }
-    
+
     Object.keys(config).forEach(key => {
       formData.append(key, config[key]);
     });
@@ -156,7 +164,7 @@ function App() {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
-              
+
               if (data.message === 'collection_complete' && data.raw_data) {
                 // Raw data collection complete - show options to download or analyze
                 setCollectedData({
@@ -271,7 +279,7 @@ function App() {
   // Helper function to convert data to CSV
   const convertToCSV = (data) => {
     if (!data || data.length === 0) return '';
-    
+
     const headers = Object.keys(data[0]);
     const csvHeaders = headers.join(',');
     const csvRows = data.map(row => {
@@ -286,7 +294,7 @@ function App() {
         return stringValue;
       }).join(',');
     });
-    
+
     return [csvHeaders, ...csvRows].join('\n');
   };
 
@@ -296,482 +304,308 @@ function App() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-primary)' }}>
-      {/* Sidebar */}
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <>
+      <div className="flex min-h-screen bg-background">
+        {/* Sidebar */}
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main Content Area */}
-      <div style={{ marginLeft: '260px', width: 'calc(100% - 260px)', display: 'flex', flexDirection: 'column' }}>
-        <Header />
+        {/* Main Content Area */}
+        <div className="ml-[260px] w-[calc(100%-260px)] flex flex-col">
+          <Header />
 
-        <main className="container" style={{ flex: 1, maxWidth: '100%', padding: '40px' }}>
-          
-          {/* Page Header (Breadcrumbs like) */}
-          <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2>
-                {activeTab === 'analyze' ? 'Overview' : 
-                 activeTab === 'results' ? 'Analysis Results' : 
-                 activeTab === 'history' ? 'Payment History' : 
-                 activeTab === 'configuration' ? 'Settings' : activeTab}
-              </h2>
+          <main className="flex-1 max-w-full p-10">
+
+            {/* Page Header (Breadcrumbs like) */}
+            <div className="mb-8 flex justify-between items-center">
+              <div>
+                <h2 className="font-display text-2xl font-bold">
+                  {activeTab === 'analyze' ? 'Overview' :
+                    activeTab === 'results' ? 'Analysis Results' :
+                      activeTab === 'history' ? 'Payment History' :
+                        activeTab === 'configuration' ? 'Settings' : activeTab}
+                </h2>
+              </div>
+              {(activeTab === 'analyze' || activeTab === 'results') && (
+                <span className="underline font-semibold cursor-pointer">Manage</span>
+              )}
             </div>
+
+            {/* Content */}
             {activeTab === 'analyze' && (
-                <div style={{ textDecoration: 'underline', fontWeight: 600, cursor: 'pointer' }}>Manage</div>
-            )}
-            {activeTab === 'results' && (
-                <div style={{ textDecoration: 'underline', fontWeight: 600, cursor: 'pointer' }}>Manage</div>
-            )}
-          </div>
+              <div className="animate-in">
+                <div className="grid grid-cols-[2fr_minmax(320px,1fr)] gap-8">
+                  <div className="flex flex-col gap-8">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          {dataSource === 'file' ? (
+                            <Upload className="size-5" />
+                          ) : (
+                            <Database className="size-5" />
+                          )}
+                          {dataSource === 'file' ? 'Upload Spotlist' : 'Fetch from AEOS TV Audit'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {/* Data Source Selector */}
+                        <Tabs value={dataSource} onValueChange={(v) => { setDataSource(v); setError(null); }} className="mb-6">
+                          <TabsList>
+                            <TabsTrigger value="file">File Upload</TabsTrigger>
+                            <TabsTrigger value="aeos">AEOS TV Audit</TabsTrigger>
+                          </TabsList>
+                        </Tabs>
 
-          {/* Content */}
-          {activeTab === 'analyze' && (
-            <div className="animate-in">
-              <div className="analyze-layout" style={{ 
-                display: 'grid',
-                gridTemplateColumns: 'minmax(0, 2fr) minmax(320px, 1fr)',
-                gap: '32px'
-              }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                  <section className="card">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)', marginBottom: 'var(--space-l)' }}>
-                      {dataSource === 'file' ? (
-                        <Upload size={20} style={{ color: 'var(--text-primary)' }} />
-                      ) : (
-                        <Database size={20} style={{ color: 'var(--text-primary)' }} />
-                      )}
-                      <h3>{dataSource === 'file' ? 'Upload Spotlist' : 'Fetch from AEOS TV Audit'}</h3>
-                    </div>
-                    
-                    {/* Data Source Selector */}
-                    <div style={{ 
-                      display: 'flex', 
-                      gap: 'var(--space-s)', 
-                      marginBottom: 'var(--space-l)',
-                      borderBottom: '1px solid var(--border-color)',
-                      paddingBottom: 'var(--space-m)'
-                    }}>
-                      <button
-                        onClick={() => {
-                          setDataSource('file');
-                          setError(null);
-                        }}
-                        style={{
-                          padding: 'var(--space-s) var(--space-m)',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          backgroundColor: dataSource === 'file' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                          color: dataSource === 'file' ? 'white' : 'var(--text-primary)',
-                          fontWeight: 500,
-                          transition: 'all var(--transition-base)'
-                        }}
-                      >
-                        File Upload
-                      </button>
-                      <button
-                        onClick={() => {
-                          setDataSource('aeos');
-                          setError(null);
-                        }}
-                        style={{
-                          padding: 'var(--space-s) var(--space-m)',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          backgroundColor: dataSource === 'aeos' ? 'var(--accent-primary)' : 'var(--bg-tertiary)',
-                          color: dataSource === 'aeos' ? 'white' : 'var(--text-primary)',
-                          fontWeight: 500,
-                          transition: 'all var(--transition-base)'
-                        }}
-                      >
-                        AEOS TV Audit
-                      </button>
-                    </div>
+                        {/* Conditional rendering based on data source */}
+                        {dataSource === 'file' ? (
+                          <FileUpload file={file} setFile={setFile} />
+                        ) : (
+                          <AeosDataFetch
+                            companyName={companyName}
+                            setCompanyName={setCompanyName}
+                            companyId={companyId}
+                            setCompanyId={setCompanyId}
+                            brandIds={brandIds}
+                            setBrandIds={setBrandIds}
+                            productIds={productIds}
+                            setProductIds={setProductIds}
+                            dateFrom={dateFrom}
+                            setDateFrom={setDateFrom}
+                            dateTo={dateTo}
+                            setDateTo={setDateTo}
+                            channelFilter={channelFilter}
+                            setChannelFilter={setChannelFilter}
+                            reportType={reportType}
+                            setReportType={setReportType}
+                            filters={filters}
+                            setFilters={setFilters}
+                            topTenSubtype={topTenSubtype}
+                            setTopTenSubtype={setTopTenSubtype}
+                          />
+                        )}
 
-                    {/* Conditional rendering based on data source */}
-                    {dataSource === 'file' ? (
-                      <FileUpload file={file} setFile={setFile} />
-                    ) : (
-                      <AeosDataFetch
-                        companyName={companyName}
-                        setCompanyName={setCompanyName}
-                        companyId={companyId}
-                        setCompanyId={setCompanyId}
-                        brandIds={brandIds}
-                        setBrandIds={setBrandIds}
-                        productIds={productIds}
-                        setProductIds={setProductIds}
-                        dateFrom={dateFrom}
-                        setDateFrom={setDateFrom}
-                        dateTo={dateTo}
-                        setDateTo={setDateTo}
-                        channelFilter={channelFilter}
-                        setChannelFilter={setChannelFilter}
-                        reportType={reportType}
-                        setReportType={setReportType}
-                        filters={filters}
-                        setFilters={setFilters}
-                        topTenSubtype={topTenSubtype}
-                        setTopTenSubtype={setTopTenSubtype}
-                      />
-                    )}
+                        {error && (
+                          <Alert variant="destructive" className="mt-4">
+                            <AlertDescription>{error}</AlertDescription>
+                          </Alert>
+                        )}
 
-                    {error && (
-                      <div style={{
-                        marginTop: 'var(--space-m)',
-                        padding: 'var(--space-m)',
-                        backgroundColor: '#FEF2F2',
-                        border: '1px solid #FECACA',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-s)',
-                        color: '#991B1B'
-                      }}>
-                        <span>{error}</span>
-                      </div>
-                    )}
+                        {/* Collection Complete - Show Options */}
+                        {dataSource === 'aeos' && collectedData && !loading && (
+                          <div className="mt-6 p-6 bg-emerald-500/10 border-2 border-emerald-500/25 rounded-xl">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="size-10 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                                <span className="text-2xl">✓</span>
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="text-lg font-semibold mb-1">
+                                  Data Collection Complete!
+                                </h3>
+                                <p className="text-sm text-muted-foreground">
+                                  Found {collectedData.metadata.total_spots} spots from {collectedData.metadata.channels_found.length} channel(s)
+                                </p>
+                              </div>
+                            </div>
 
-                    {/* Collection Complete - Show Options */}
-                    {dataSource === 'aeos' && collectedData && !loading && (
-                      <div style={{
-                        marginTop: 'var(--space-l)',
-                        padding: 'var(--space-l)',
-                        backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                        border: '2px solid rgba(16, 185, 129, 0.25)',
-                        borderRadius: '12px'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 'var(--space-s)',
-                          marginBottom: 'var(--space-m)'
-                        }}>
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            flexShrink: 0
-                          }}>
-                            <span style={{ fontSize: '24px' }}>✓</span>
-                          </div>
-                          <div style={{ flex: 1 }}>
-                            <h3 style={{
-                              fontSize: 'var(--font-size-lg)',
-                              fontWeight: 600,
-                              color: 'var(--text-primary)',
-                              margin: 0,
-                              marginBottom: 'var(--space-xs)'
-                            }}>
-                              Data Collection Complete!
-                            </h3>
-                            <p style={{
-                              fontSize: 'var(--font-size-sm)',
-                              color: 'var(--text-secondary)',
-                              margin: 0
-                            }}>
-                              Found {collectedData.metadata.total_spots} spots from {collectedData.metadata.channels_found.length} channel(s)
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div style={{
-                          display: 'flex',
-                          gap: 'var(--space-m)',
-                          marginTop: 'var(--space-m)'
-                        }}>
-                          <button
-                            onClick={handleDownloadRawData}
-                            style={{
-                              flex: 1,
-                              padding: 'var(--space-m) var(--space-l)',
-                              backgroundColor: 'var(--bg-secondary)',
-                              border: '2px solid var(--border-color)',
-                              borderRadius: '8px',
-                              color: 'var(--text-primary)',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              fontSize: 'var(--font-size-base)',
-                              transition: 'all var(--transition-base)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 'var(--space-s)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
-                              e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                              e.currentTarget.style.borderColor = 'var(--border-color)';
-                            }}
-                          >
-                            <Download size={20} />
-                            Download Raw Data
-                          </button>
-                          
-                          <button
-                            onClick={handleAnalyzeCollectedData}
-                            style={{
-                              flex: 1,
-                              padding: 'var(--space-m) var(--space-l)',
-                              backgroundColor: 'var(--accent-primary)',
-                              border: 'none',
-                              borderRadius: '8px',
-                              color: 'white',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              fontSize: 'var(--font-size-base)',
-                              transition: 'all var(--transition-base)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 'var(--space-s)'
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.opacity = '0.9';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.opacity = '1';
-                            }}
-                          >
-                            <Activity size={20} />
-                            Analyze Data
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                            <div className="flex gap-4">
+                              <Button
+                                variant="outline"
+                                onClick={handleDownloadRawData}
+                                className="flex-1"
+                              >
+                                <Download className="size-5" />
+                                Download Raw Data
+                              </Button>
 
-                    {/* Progress Bar */}
-                    {dataSource === 'aeos' && loading && (
-                      <div style={{
-                        marginTop: 'var(--space-l)',
-                        padding: 'var(--space-m)',
-                        backgroundColor: 'var(--bg-secondary)',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border-color)'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          marginBottom: 'var(--space-s)'
-                        }}>
-                          <span style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 500,
-                            color: 'var(--text-primary)'
-                          }}>
-                            {progress.message || 'Processing...'}
-                          </span>
-                          <span style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 600,
-                            color: 'var(--accent-primary)'
-                          }}>
-                            {progress.percentage}%
-                          </span>
-                        </div>
-                        <div style={{
-                          width: '100%',
-                          height: '8px',
-                          backgroundColor: 'var(--bg-tertiary)',
-                          borderRadius: '4px',
-                          overflow: 'hidden'
-                        }}>
-                          <div style={{
-                            width: `${progress.percentage}%`,
-                            height: '100%',
-                            backgroundColor: progress.stage === 'error' ? '#EF4444' : 
-                                           progress.stage === 'success' ? '#10B981' : 
-                                           'var(--accent-primary)',
-                            transition: 'width 0.3s ease',
-                            borderRadius: '4px'
-                          }} />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Primary action button - more prominent */}
-                    {dataSource === 'aeos' && (
-                      <div>
-                        {!loading && !collectedData && (
-                          <div style={{
-                            marginTop: 'var(--space-m)',
-                            padding: 'var(--space-s) var(--space-m)',
-                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                            border: '1px solid rgba(59, 130, 246, 0.2)',
-                            borderRadius: '8px',
-                            fontSize: 'var(--font-size-sm)',
-                            color: 'var(--text-secondary)',
-                            textAlign: 'center'
-                          }}>
-                            ⏱️ Data collection may take several minutes depending on the number of channels and date range.
+                              <Button
+                                onClick={handleAnalyzeCollectedData}
+                                className="flex-1"
+                              >
+                                <Activity className="size-5" />
+                                Analyze Data
+                              </Button>
+                            </div>
                           </div>
                         )}
-                        <button
-                          onClick={handleAnalyzeAeos}
-                          disabled={(() => {
-                            // Company name is required only for certain report types
-                            const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
-                            return (requiresCompany && !companyName) || !dateFrom || !dateTo || loading;
-                          })()}
-                          className="btn"
-                          style={{ 
-                            width: '100%', 
-                            marginTop: 'var(--space-m)',
-                            padding: 'var(--space-m) var(--space-l)',
-                            fontSize: 'var(--font-size-base)',
-                            fontWeight: 600,
-                            backgroundColor: 'var(--accent-primary)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: (() => {
+
+                        {/* Progress Bar */}
+                        {dataSource === 'aeos' && loading && (
+                          <div className="mt-6 p-4 bg-muted rounded-lg border">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-sm font-medium">
+                                {progress.message || 'Processing...'}
+                              </span>
+                              <Badge variant={progress.stage === 'error' ? 'destructive' : progress.stage === 'success' ? 'success' : 'default'}>
+                                {progress.percentage}%
+                              </Badge>
+                            </div>
+                            <Progress
+                              value={progress.percentage}
+                              className={cn(
+                                progress.stage === 'error' && "[&>div]:bg-destructive",
+                                progress.stage === 'success' && "[&>div]:bg-emerald-500"
+                              )}
+                            />
+                          </div>
+                        )}
+
+                        {/* Primary action button - more prominent */}
+                        {dataSource === 'aeos' && (
+                          <div>
+                            {!loading && !collectedData && (
+                              <Alert variant="info" className="mt-4">
+                                <AlertDescription className="text-center">
+                                  ⏱️ Data collection may take several minutes depending on the number of channels and date range.
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                            <Button
+                              onClick={handleAnalyzeAeos}
+                              disabled={(() => {
+                                // Company name is required only for certain report types
+                                const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+                                return (requiresCompany && !companyName) || !dateFrom || !dateTo || loading;
+                              })()}
+                              className="w-full mt-4"
+                              size="lg"
+                            >
+                              {loading ? (
+                                <>
+                                  <div className="loading-spinner" />
+                                  Collecting Data from AEOS...
+                                </>
+                              ) : collectedData ? (
+                                '▶ Collect New Data'
+                              ) : (
+                                '▶ Start Data Collection'
+                              )}
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="flex flex-col gap-6">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Settings className="size-5" />
+                          Configuration
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ConfigPanel config={config} setConfig={setConfig} />
+
+                        <Button
+                          onClick={dataSource === 'file' ? handleAnalyze : handleAnalyzeAeos}
+                          disabled={
+                            (dataSource === 'file' && !file) ||
+                            (dataSource === 'aeos' && (() => {
+                              // Company name is required only for certain report types
                               const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
-                              return ((requiresCompany && !companyName) || !dateFrom || !dateTo || loading) ? 'not-allowed' : 'pointer';
-                            })(),
-                            opacity: (() => {
-                              const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
-                              return ((requiresCompany && !companyName) || !dateFrom || !dateTo || loading) ? 0.6 : 1;
-                            })(),
-                            transition: 'opacity var(--transition-base)'
-                          }}
+                              return (requiresCompany && !companyName) || !dateFrom || !dateTo;
+                            })()) ||
+                            loading
+                          }
+                          className="w-full mt-6"
                         >
                           {loading ? (
                             <>
                               <div className="loading-spinner" />
-                              Collecting Data from AEOS...
+                              {dataSource === 'aeos' ? 'Fetching & Analyzing...' : 'Analyzing...'}
                             </>
-                          ) : collectedData ? (
-                            '▶ Collect New Data'
                           ) : (
-                            '▶ Start Data Collection'
+                            'Run Analysis'
                           )}
-                        </button>
-                      </div>
-                    )}
-                  </section>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                  <section className="card">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)', marginBottom: 'var(--space-l)' }}>
-                      <Settings size={20} style={{ color: 'var(--text-primary)' }} />
-                      <h3>Configuration</h3>
-                    </div>
-                    <ConfigPanel config={config} setConfig={setConfig} />
-
-                    <button
-                      onClick={dataSource === 'file' ? handleAnalyze : handleAnalyzeAeos}
-                      disabled={
-                        (dataSource === 'file' && !file) ||
-                        (dataSource === 'aeos' && (() => {
-                          // Company name is required only for certain report types
-                          const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
-                          return (requiresCompany && !companyName) || !dateFrom || !dateTo;
-                        })()) ||
-                        loading
-                      }
-                      className="btn"
-                      style={{ width: '100%', marginTop: 'var(--space-l)' }}
-                    >
-                      {loading ? (
-                        <>
-                          <div className="loading-spinner" />
-                          {dataSource === 'aeos' ? 'Fetching & Analyzing...' : 'Analyzing...'}
-                        </>
-                      ) : (
-                        'Run Analysis'
-                      )}
-                    </button>
-                  </section>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Results Tab */}
-          {activeTab === 'results' && results && (
-            <div className="animate-in">
-            <Dashboard data={results} />
-          </div>
-        )}
+            {/* Results Tab */}
+            {activeTab === 'results' && results && (
+              <div className="animate-in">
+                <Dashboard data={results} />
+              </div>
+            )}
 
-          {/* History Tab */}
-          {activeTab === 'history' && (
-            <div className="animate-in">
-              {history.length === 0 ? (
-                <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
-                  <Clock size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
-                  <p className="text-secondary">No analysis history yet.</p>
-                </div>
-              ) : (
-                <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                  {history.map((item) => (
-                    <div
-                      key={item.id}
-                      className="card"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleSelectHistory(item)}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                        <FileText size={20} style={{ color: 'var(--accent-primary-dark)' }} />
-                        <span className="text-tertiary" style={{ fontSize: '12px' }}>
-                          {new Date(item.timestamp).toLocaleDateString()}
-                        </span>
-                      </div>
-                      <h3 style={{ marginBottom: '8px', fontSize: '16px' }}>
-                        {item.fileName}
-                      </h3>
-                      {item.metrics && (
-                        <div style={{ display: 'flex', gap: '16px', marginTop: '16px' }}>
-                          <div>
-                            <div className="text-tertiary" style={{ fontSize: '12px' }}>Spots</div>
-                            <div style={{ fontWeight: 600 }}>{item.metrics.total_spots?.toLocaleString()}</div>
+            {/* History Tab */}
+            {activeTab === 'history' && (
+              <div className="animate-in">
+                {history.length === 0 ? (
+                  <Card className="text-center py-16">
+                    <CardContent>
+                      <Clock className="size-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">No analysis history yet.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+                    {history.map((item) => (
+                      <Card
+                        key={item.id}
+                        className="cursor-pointer hover:shadow-md transition-shadow"
+                        onClick={() => handleSelectHistory(item)}
+                      >
+                        <CardContent className="pt-6">
+                          <div className="flex items-start justify-between mb-4">
+                            <FileText className="size-5 text-primary" />
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(item.timestamp).toLocaleDateString()}
+                            </span>
                           </div>
-                          <div>
-                            <div className="text-tertiary" style={{ fontSize: '12px' }}>Double</div>
-                            <div style={{ fontWeight: 600, color: 'var(--accent-warning)' }}>
-                              {item.metrics.double_spots?.toLocaleString()}
+                          <h3 className="font-semibold mb-2">
+                            {item.fileName}
+                          </h3>
+                          {item.metrics && (
+                            <div className="flex gap-4 mt-4">
+                              <div>
+                                <div className="text-xs text-muted-foreground">Spots</div>
+                                <div className="font-semibold">{item.metrics.total_spots?.toLocaleString()}</div>
+                              </div>
+                              <div>
+                                <div className="text-xs text-muted-foreground">Double</div>
+                                <div className="font-semibold text-amber-500">
+                                  {item.metrics.double_spots?.toLocaleString()}
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Configuration Tab */}
-          {activeTab === 'configuration' && (
-            <div className="animate-in">
-              <div className="card" style={{ maxWidth: '600px' }}>
-                <ConfigPanel config={config} setConfig={setConfig} />
-                <button
-                  className="btn"
-                  style={{ marginTop: '24px' }}
-                  onClick={() => {
-                    localStorage.setItem('spotlistConfig', JSON.stringify(config));
-                    alert('Settings saved as default');
-                  }}
-                >
-                  Save as Default
-                </button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-      </main>
+            )}
+
+            {/* Configuration Tab */}
+            {activeTab === 'configuration' && (
+              <div className="animate-in">
+                <Card className="max-w-xl">
+                  <CardContent className="pt-6">
+                    <ConfigPanel config={config} setConfig={setConfig} />
+                    <Button
+                      className="mt-6"
+                      onClick={() => {
+                        localStorage.setItem('spotlistConfig', JSON.stringify(config));
+                        alert('Settings saved as default');
+                      }}
+                    >
+                      Save as Default
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </main>
+        </div>
       </div>
-    </div>
+      <Toaster />
+    </>
   );
 }
 

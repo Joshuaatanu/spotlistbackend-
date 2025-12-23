@@ -5,6 +5,12 @@ import EnhancedFilters from './EnhancedFilters';
 import CompanySelector from './CompanySelector';
 import BrandSelector from './BrandSelector';
 import ProductSelector from './ProductSelector';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 // Report-specific parameter configurations
 const REPORT_CONFIGS = {
@@ -21,7 +27,7 @@ const REPORT_CONFIGS = {
         showCompanySelector: true,
         showChannelFilter: true,
         showAdvancedFilters: true,
-        defaultDateRange: 7 // days
+        defaultDateRange: 7
     },
     topTen: {
         name: 'Top Ten Report',
@@ -34,12 +40,12 @@ const REPORT_CONFIGS = {
             'Select subtype: Spots (ads by XRP), Events (by Share), or Channels (by Share)',
             'Company filter is not available for Top Ten reports'
         ],
-        showCompanySelector: false, // Not supported by Top Ten API
-        showChannelFilter: false, // Not supported by Top Ten API
+        showCompanySelector: false,
+        showChannelFilter: false,
         showAdvancedFilters: false,
-        defaultDateRange: 7, // Changed to 7 days to match API limitation
-        showTopTenSubtype: true, // Show subtype selector
-        showPeriodInfo: true // Show period limitation info
+        defaultDateRange: 7,
+        showTopTenSubtype: true,
+        showPeriodInfo: true
     },
     reachFrequency: {
         name: 'Reach & Frequency',
@@ -113,10 +119,8 @@ export default function AeosDataFetchOptimized({
 }) {
     const [showHelp, setShowHelp] = useState(false);
 
-    // Get current report configuration
     const reportConfig = REPORT_CONFIGS[reportType] || REPORT_CONFIGS.spotlist;
 
-    // Helper functions for date handling
     const getDefaultDateTo = () => {
         const today = new Date();
         return today.toISOString().split('T')[0];
@@ -129,7 +133,6 @@ export default function AeosDataFetchOptimized({
         return pastDate.toISOString().split('T')[0];
     };
 
-    // Initialize dates based on report type
     useEffect(() => {
         if (!dateFrom) {
             setDateFrom(getDefaultDateFrom(reportConfig.defaultDateRange));
@@ -139,22 +142,14 @@ export default function AeosDataFetchOptimized({
         }
     }, []);
 
-    // Update date range when report type changes (optional - can be removed if not desired)
     useEffect(() => {
-        if (reportType) {
-            // Optionally reset dates when changing report types
-            // Commented out to preserve user selections
-            // setDateFrom(getDefaultDateFrom(reportConfig.defaultDateRange));
-            // setDateTo(getDefaultDateTo());
-        }
+        // Optional: reset dates when changing report types
     }, [reportType]);
 
-    // Validation state
     const validation = useMemo(() => {
         const errors = [];
         const warnings = [];
 
-        // Check required parameters
         if (reportConfig.requiredParams.includes('companyName') && !companyName?.trim()) {
             errors.push('Company name is required for this report type');
         }
@@ -168,7 +163,6 @@ export default function AeosDataFetchOptimized({
             errors.push('Channel filter is required for this report type');
         }
 
-        // Check date range validity
         if (dateFrom && dateTo) {
             const fromDate = new Date(dateFrom);
             const toDate = new Date(dateTo);
@@ -183,7 +177,6 @@ export default function AeosDataFetchOptimized({
             }
         }
 
-        // Report-specific warnings
         if (reportType === 'reachFrequency' && channelFilter && channelFilter.split(',').length > 5) {
             warnings.push('Reach & Frequency works best with 1-5 channels');
         }
@@ -196,88 +189,56 @@ export default function AeosDataFetchOptimized({
         };
     }, [companyName, dateFrom, dateTo, channelFilter, reportType, reportConfig]);
 
-    // Quick date range presets
     const applyDatePreset = (days) => {
         setDateTo(getDefaultDateTo());
         setDateFrom(getDefaultDateFrom(days));
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-m)' }}>
-            {/* Report Type Selector - Moved to top for better UX */}
+        <div className="flex flex-col gap-4">
+            {/* Report Type Selector */}
             <div>
                 <ReportTypeSelector
                     reportType={reportType || 'spotlist'}
-                    setReportType={setReportType || (() => {})}
+                    setReportType={setReportType || (() => { })}
                 />
 
                 {/* Report Description & Help */}
-                <div style={{
-                    marginTop: 'var(--space-s)',
-                    padding: 'var(--space-s) var(--space-m)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.05)',
-                    border: '1px solid rgba(59, 130, 246, 0.15)',
-                    borderRadius: '6px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'start', gap: 'var(--space-s)' }}>
-                        <Info size={16} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '2px' }} />
-                        <div style={{ flex: 1 }}>
-                            <p style={{
-                                fontSize: 'var(--font-size-xs)',
-                                color: 'var(--text-secondary)',
-                                margin: 0
-                            }}>
-                                {reportConfig.description}
-                            </p>
-                            {showHelp && (
-                                <ul style={{
-                                    fontSize: 'var(--font-size-xs)',
-                                    color: 'var(--text-tertiary)',
-                                    margin: 'var(--space-xs) 0 0 0',
-                                    paddingLeft: 'var(--space-m)',
-                                    listStyle: 'disc'
-                                }}>
-                                    {reportConfig.tips.map((tip, i) => (
-                                        <li key={i} style={{ marginTop: '4px' }}>{tip}</li>
-                                    ))}
-                                </ul>
-                            )}
+                <Alert variant="info" className="mt-3">
+                    <Info className="size-4" />
+                    <AlertDescription className="flex-1">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <p className="text-xs">{reportConfig.description}</p>
+                                {showHelp && (
+                                    <ul className="text-xs text-muted-foreground mt-2 list-disc pl-4 space-y-1">
+                                        {reportConfig.tips.map((tip, i) => (
+                                            <li key={i}>{tip}</li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
+                            <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => setShowHelp(!showHelp)}
+                                className="text-xs h-auto p-0"
+                            >
+                                {showHelp ? 'Hide' : 'Tips'}
+                            </Button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setShowHelp(!showHelp)}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--accent-primary)',
-                                cursor: 'pointer',
-                                fontSize: 'var(--font-size-xs)',
-                                fontWeight: 500,
-                                padding: 0
-                            }}
-                        >
-                            {showHelp ? 'Hide' : 'Tips'}
-                        </button>
-                    </div>
-                </div>
+                    </AlertDescription>
+                </Alert>
             </div>
 
-            {/* Top Ten Subtype Selector - Only for Top Ten reports */}
+            {/* Top Ten Subtype Selector */}
             {reportConfig.showTopTenSubtype && (
                 <div>
-                    <label style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-s)',
-                        marginBottom: 'var(--space-s)',
-                        fontSize: 'var(--font-size-sm)',
-                        fontWeight: 500,
-                        color: 'var(--text-primary)'
-                    }}>
-                        <BarChart3 size={16} />
+                    <Label className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="size-4" />
                         Top Ten Type
-                    </label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 'var(--space-s)' }}>
+                    </Label>
+                    <div className="grid grid-cols-3 gap-2">
                         {[
                             { value: 'spots', label: 'Top Spots', desc: 'Top 10 ads by XRP' },
                             { value: 'events', label: 'Top Events', desc: 'Top 10 events by Share' },
@@ -287,40 +248,22 @@ export default function AeosDataFetchOptimized({
                                 key={option.value}
                                 type="button"
                                 onClick={() => setTopTenSubtype(option.value)}
-                                style={{
-                                    padding: 'var(--space-m)',
-                                    border: `2px solid ${topTenSubtype === option.value ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                                    borderRadius: '8px',
-                                    backgroundColor: topTenSubtype === option.value ? 'rgba(59, 130, 246, 0.1)' : 'var(--bg-secondary)',
-                                    color: 'var(--text-primary)',
-                                    cursor: 'pointer',
-                                    textAlign: 'left',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (topTenSubtype !== option.value) {
-                                        e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                                        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.05)';
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (topTenSubtype !== option.value) {
-                                        e.currentTarget.style.borderColor = 'var(--border-color)';
-                                        e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                                    }
-                                }}
+                                className={cn(
+                                    "p-4 border-2 rounded-lg text-left transition-all",
+                                    topTenSubtype === option.value
+                                        ? "border-primary bg-primary/10"
+                                        : "border-border bg-card hover:border-primary/50 hover:bg-muted"
+                                )}
                             >
-                                <div style={{ fontWeight: 600, marginBottom: '4px' }}>{option.label}</div>
-                                <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)' }}>
-                                    {option.desc}
-                                </div>
+                                <div className="font-semibold text-sm">{option.label}</div>
+                                <div className="text-xs text-muted-foreground">{option.desc}</div>
                             </button>
                         ))}
                     </div>
                 </div>
             )}
 
-            {/* Company Selector - Conditional based on report type */}
+            {/* Company Selector */}
             {reportConfig.showCompanySelector && (
                 <div>
                     <CompanySelector
@@ -329,139 +272,73 @@ export default function AeosDataFetchOptimized({
                         setCompanyId={setCompanyId}
                     />
                     {reportConfig.requiredParams.includes('companyName') && (
-                        <p style={{
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-tertiary)',
-                            marginTop: 'var(--space-xs)',
-                            margin: 'var(--space-xs) 0 0 0'
-                        }}>
+                        <p className="text-xs text-muted-foreground mt-1">
                             * Required for this report type
                         </p>
                     )}
                 </div>
             )}
 
-            {/* Brand Selector - Only for spotlist reports */}
+            {/* Brand Selector */}
             {reportType === 'spotlist' && companyId && (
-                <div style={{ marginTop: 'var(--space-m)' }}>
-                    <BrandSelector
-                        companyId={companyId}
-                        brandIds={brandIds}
-                        setBrandIds={setBrandIds}
-                    />
-                </div>
+                <BrandSelector
+                    companyId={companyId}
+                    brandIds={brandIds}
+                    setBrandIds={setBrandIds}
+                />
             )}
 
-            {/* Product Selector - Only for spotlist reports */}
-            {/* Show if brands are selected OR if company is selected (to show all products) */}
+            {/* Product Selector */}
             {reportType === 'spotlist' && ((brandIds && brandIds.length > 0) || companyId) && (
-                <div style={{ marginTop: 'var(--space-m)' }}>
-                    <ProductSelector
-                        brandIds={brandIds}
-                        companyId={companyId}
-                        productIds={productIds}
-                        setProductIds={setProductIds}
-                    />
-                </div>
+                <ProductSelector
+                    brandIds={brandIds}
+                    companyId={companyId}
+                    productIds={productIds}
+                    setProductIds={setProductIds}
+                />
             )}
 
             {/* Date Range with Quick Presets */}
             <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-s)' }}>
-                    <label style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-s)',
-                        fontSize: 'var(--font-size-sm)',
-                        fontWeight: 500,
-                        color: 'var(--text-primary)'
-                    }}>
-                        <Calendar size={16} />
+                <div className="flex items-center justify-between mb-2">
+                    <Label className="flex items-center gap-2">
+                        <Calendar className="size-4" />
                         {reportConfig.showPeriodInfo ? 'Date Range (Period Selection)' : 'Date Range'}
-                    </label>
-                    <div style={{ display: 'flex', gap: 'var(--space-xs)' }}>
+                    </Label>
+                    <div className="flex gap-1">
                         {[7, 14, 30, 90].map(days => (
-                            <button
+                            <Button
                                 key={days}
                                 type="button"
+                                variant="outline"
+                                size="sm"
                                 onClick={() => applyDatePreset(days)}
-                                style={{
-                                    padding: '4px 8px',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: '4px',
-                                    backgroundColor: 'var(--bg-secondary)',
-                                    color: 'var(--text-secondary)',
-                                    cursor: 'pointer',
-                                    fontSize: 'var(--font-size-xs)',
-                                    fontWeight: 400,
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
-                                    e.currentTarget.style.color = 'white';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                                    e.currentTarget.style.color = 'var(--text-secondary)';
-                                }}
+                                className="h-7 px-2 text-xs"
                             >
                                 {days}d
-                            </button>
+                            </Button>
                         ))}
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-m)' }}>
+                <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label style={{
-                            display: 'block',
-                            marginBottom: 'var(--space-xs)',
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-secondary)'
-                        }}>
-                            From
-                        </label>
-                        <input
+                        <Label className="text-xs text-muted-foreground mb-1 block">From</Label>
+                        <Input
                             type="date"
                             value={dateFrom}
                             onChange={(e) => setDateFrom(e.target.value)}
                             max={dateTo || getDefaultDateTo()}
-                            style={{
-                                width: '100%',
-                                padding: 'var(--space-m)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: 'var(--font-size-base)',
-                                backgroundColor: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)'
-                            }}
                         />
                     </div>
-
                     <div>
-                        <label style={{
-                            display: 'block',
-                            marginBottom: 'var(--space-xs)',
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-secondary)'
-                        }}>
-                            To
-                        </label>
-                        <input
+                        <Label className="text-xs text-muted-foreground mb-1 block">To</Label>
+                        <Input
                             type="date"
                             value={dateTo}
                             onChange={(e) => setDateTo(e.target.value)}
                             min={dateFrom || getDefaultDateFrom(reportConfig.defaultDateRange)}
                             max={getDefaultDateTo()}
-                            style={{
-                                width: '100%',
-                                padding: 'var(--space-m)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '8px',
-                                fontSize: 'var(--font-size-base)',
-                                backgroundColor: 'var(--bg-secondary)',
-                                color: 'var(--text-primary)'
-                            }}
                         />
                     </div>
                 </div>
@@ -475,107 +352,60 @@ export default function AeosDataFetchOptimized({
                     today.setHours(0, 0, 0, 0);
                     const yesterday = new Date(today);
                     yesterday.setDate(yesterday.getDate() - 1);
-                    
-                    // Check if date range matches "Yesterday" or "Last 7 days" for Top Ten
+
                     let periodInfo = null;
                     if (reportConfig.showPeriodInfo) {
                         const toDateOnly = new Date(dateTo);
                         toDateOnly.setHours(0, 0, 0, 0);
-                        const fromDateOnly = new Date(dateFrom);
-                        fromDateOnly.setHours(0, 0, 0, 0);
-                        
+
                         if (toDateOnly.getTime() === yesterday.getTime() && daysDiff === 0) {
-                            periodInfo = { period: 'Yesterday', color: '#10B981' };
+                            periodInfo = { period: 'Yesterday', variant: 'success' };
                         } else if (daysDiff <= 6 && daysDiff >= 0) {
-                            periodInfo = { period: 'Last 7 days', color: '#10B981' };
+                            periodInfo = { period: 'Last 7 days', variant: 'success' };
                         } else {
-                            periodInfo = { period: 'Will use "Last 7 days"', color: '#F59E0B' };
+                            periodInfo = { period: 'Will use "Last 7 days"', variant: 'warning' };
                         }
                     }
-                    
+
                     return (
-                        <div>
-                            <p style={{
-                                fontSize: 'var(--font-size-xs)',
-                                color: 'var(--text-tertiary)',
-                                marginTop: 'var(--space-xs)',
-                                margin: 'var(--space-xs) 0 0 0'
-                            }}>
+                        <div className="mt-2">
+                            <p className="text-xs text-muted-foreground">
                                 {daysDiff >= 0 ? `${daysDiff + 1} days selected` : 'Invalid date range'}
                             </p>
                             {periodInfo && (
-                                <div style={{
-                                    marginTop: 'var(--space-xs)',
-                                    padding: 'var(--space-s) var(--space-m)',
-                                    backgroundColor: `${periodInfo.color}15`,
-                                    border: `1px solid ${periodInfo.color}40`,
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    alignItems: 'start',
-                                    gap: 'var(--space-s)'
-                                }}>
-                                    <AlertCircle size={16} style={{ color: periodInfo.color, flexShrink: 0, marginTop: '2px' }} />
-                                    <div>
-                                        <p style={{
-                                            fontSize: 'var(--font-size-xs)',
-                                            fontWeight: 500,
-                                            color: periodInfo.color,
-                                            margin: 0,
-                                            marginBottom: '2px'
-                                        }}>
-                                            API Period: {periodInfo.period}
-                                        </p>
-                                        <p style={{
-                                            fontSize: 'var(--font-size-xs)',
-                                            color: 'var(--text-secondary)',
-                                            margin: 0
-                                        }}>
-                                            Top Ten reports only support "Yesterday" or "Last 7 days". Your date range will be converted automatically.
-                                        </p>
-                                    </div>
-                                </div>
+                                <Alert variant={periodInfo.variant} className="mt-2">
+                                    <AlertCircle className="size-4" />
+                                    <AlertDescription>
+                                        <p className="font-medium text-xs">API Period: {periodInfo.period}</p>
+                                        <p className="text-xs">Top Ten reports only support "Yesterday" or "Last 7 days". Your date range will be converted automatically.</p>
+                                    </AlertDescription>
+                                </Alert>
                             )}
                         </div>
                     );
                 })()}
             </div>
 
-            {/* Channel Filter - Conditional based on report type */}
+            {/* Channel Filter */}
             {reportConfig.showChannelFilter && (
                 <div>
-                    <label style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--space-s)',
-                        marginBottom: 'var(--space-s)',
-                        fontSize: 'var(--font-size-sm)',
-                        fontWeight: 500,
-                        color: 'var(--text-primary)'
-                    }}>
-                        <Database size={16} />
+                    <Label className="flex items-center gap-2 mb-2">
+                        <Database className="size-4" />
                         Channel Filter {!reportConfig.channelFilterRequired && '(Optional)'}
-                    </label>
-                    <input
+                    </Label>
+                    <Input
                         type="text"
                         value={channelFilter}
                         onChange={(e) => setChannelFilter(e.target.value)}
                         placeholder="e.g., VOX, RTL or VOX,RTL,Pro7 (leave empty for all channels)"
-                        style={{
-                            width: '100%',
-                            padding: 'var(--space-m)',
-                            border: `1px solid ${reportConfig.channelFilterRequired && !channelFilter ? '#EF4444' : 'var(--border-color)'}`,
-                            borderRadius: '8px',
-                            fontSize: 'var(--font-size-base)',
-                            backgroundColor: 'var(--bg-secondary)',
-                            color: 'var(--text-primary)'
-                        }}
+                        className={cn(
+                            reportConfig.channelFilterRequired && !channelFilter && "border-destructive"
+                        )}
                     />
-                    <p style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: reportConfig.channelFilterRequired && !channelFilter ? '#EF4444' : 'var(--text-tertiary)',
-                        marginTop: 'var(--space-xs)',
-                        margin: 'var(--space-xs) 0 0 0'
-                    }}>
+                    <p className={cn(
+                        "text-xs mt-1",
+                        reportConfig.channelFilterRequired && !channelFilter ? "text-destructive" : "text-muted-foreground"
+                    )}>
                         {channelFilter
                             ? `Searching channels: ${channelFilter.split(',').map(c => c.trim()).join(', ')}`
                             : reportConfig.channelFilterRequired
@@ -585,126 +415,60 @@ export default function AeosDataFetchOptimized({
                 </div>
             )}
 
-            {/* Enhanced Filters - Conditional based on report type */}
+            {/* Enhanced Filters */}
             {reportConfig.showAdvancedFilters && (
                 <EnhancedFilters
                     filters={filters || {}}
-                    setFilters={setFilters || (() => {})}
+                    setFilters={setFilters || (() => { })}
                 />
             )}
 
             {/* Validation Messages */}
             {(validation.errors.length > 0 || validation.warnings.length > 0) && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
+                <div className="flex flex-col gap-2">
                     {validation.errors.map((error, i) => (
-                        <div key={`error-${i}`} style={{
-                            padding: 'var(--space-s) var(--space-m)',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'start',
-                            gap: 'var(--space-s)'
-                        }}>
-                            <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0, marginTop: '2px' }} />
-                            <p style={{
-                                fontSize: 'var(--font-size-xs)',
-                                color: '#EF4444',
-                                margin: 0
-                            }}>
-                                {error}
-                            </p>
-                        </div>
+                        <Alert key={`error-${i}`} variant="destructive">
+                            <AlertCircle className="size-4" />
+                            <AlertDescription className="text-xs">{error}</AlertDescription>
+                        </Alert>
                     ))}
                     {validation.warnings.map((warning, i) => (
-                        <div key={`warning-${i}`} style={{
-                            padding: 'var(--space-s) var(--space-m)',
-                            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                            border: '1px solid rgba(245, 158, 11, 0.3)',
-                            borderRadius: '6px',
-                            display: 'flex',
-                            alignItems: 'start',
-                            gap: 'var(--space-s)'
-                        }}>
-                            <Info size={16} style={{ color: '#F59E0B', flexShrink: 0, marginTop: '2px' }} />
-                            <p style={{
-                                fontSize: 'var(--font-size-xs)',
-                                color: '#F59E0B',
-                                margin: 0
-                            }}>
-                                {warning}
-                            </p>
-                        </div>
+                        <Alert key={`warning-${i}`} variant="warning">
+                            <Info className="size-4" />
+                            <AlertDescription className="text-xs">{warning}</AlertDescription>
+                        </Alert>
                     ))}
                 </div>
             )}
 
             {/* Ready to Fetch Indicator */}
             {validation.isValid && (
-                <div style={{
-                    padding: 'var(--space-m)',
-                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                    borderRadius: '8px',
-                    display: 'flex',
-                    alignItems: 'start',
-                    gap: 'var(--space-s)'
-                }}>
-                    <CheckCircle2 size={20} style={{ color: '#10B981', flexShrink: 0, marginTop: '2px' }} />
-                    <div>
-                        <p style={{
-                            fontSize: 'var(--font-size-sm)',
-                            fontWeight: 500,
-                            color: '#10B981',
-                            margin: 0,
-                            marginBottom: 'var(--space-xs)'
-                        }}>
+                <Alert variant="success">
+                    <CheckCircle2 className="size-5" />
+                    <AlertDescription>
+                        <p className="font-medium text-sm text-emerald-600">
                             Ready to fetch {reportConfig.name}
                         </p>
-                        <p style={{
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-secondary)',
-                            margin: 0
-                        }}>
+                        <p className="text-xs text-muted-foreground">
                             {companyName && `Company: ${companyName} • `}
                             {dateFrom && dateTo && `${dateFrom} to ${dateTo}`}
                             {channelFilter && ` • Channels: ${channelFilter}`}
                         </p>
-                    </div>
-                </div>
+                    </AlertDescription>
+                </Alert>
             )}
 
             {/* Info Box */}
-            <div style={{
-                padding: 'var(--space-m)',
-                backgroundColor: 'rgba(10, 132, 255, 0.08)',
-                border: '1px solid rgba(10, 132, 255, 0.25)',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'start',
-                gap: 'var(--space-s)'
-            }}>
-                <Database size={20} style={{ color: 'var(--accent-primary)', flexShrink: 0, marginTop: '2px' }} />
-                <div>
-                    <p style={{
-                        fontSize: 'var(--font-size-sm)',
-                        fontWeight: 500,
-                        color: 'var(--text-primary)',
-                        margin: 0,
-                        marginBottom: 'var(--space-xs)'
-                    }}>
-                        Fetching from AEOS TV Audit
-                    </p>
-                    <p style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--text-secondary)',
-                        margin: 0
-                    }}>
+            <Alert variant="info">
+                <Database className="size-5" />
+                <AlertDescription>
+                    <p className="font-medium text-sm">Fetching from AEOS TV Audit</p>
+                    <p className="text-xs text-muted-foreground">
                         Data will be pulled from the AEOS API based on your selected report type and parameters.
                         Large date ranges may take several minutes to process.
                     </p>
-                </div>
-            </div>
+                </AlertDescription>
+            </Alert>
         </div>
     );
 }

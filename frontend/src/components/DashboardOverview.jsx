@@ -1,16 +1,11 @@
 import { useMemo } from 'react';
 import { TrendingUp, AlertTriangle, Activity, BarChart3, DollarSign, Users, Target, Clock } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
-/**
- * Dashboard Overview Component
- * 
- * Displays quick stats and overview cards at the top of the dashboard.
- * Adapts to different report types and provides at-a-glance insights.
- */
 export default function DashboardOverview({ data, reportType, metadata }) {
     const { metrics, window_summaries, data: rawData } = data || {};
 
-    // Calculate quick stats based on report type
     const quickStats = useMemo(() => {
         if (!data) return null;
 
@@ -22,11 +17,10 @@ export default function DashboardOverview({ data, reportType, metadata }) {
                     totalBudget: metrics?.total_cost || 0,
                     riskScore: calculateRiskScore(metrics, window_summaries),
                     topChannel: getTopChannel(rawData),
-                    avgCostPerSpot: metrics?.total_cost && metrics?.total_spots 
-                        ? (metrics.total_cost / metrics.total_spots).toFixed(2) 
+                    avgCostPerSpot: metrics?.total_cost && metrics?.total_spots
+                        ? (metrics.total_cost / metrics.total_spots).toFixed(2)
                         : 0
                 };
-            
             case 'topTen':
                 return {
                     totalSpots: rawData?.length || 0,
@@ -34,7 +28,6 @@ export default function DashboardOverview({ data, reportType, metadata }) {
                     topValue: getTopValue(rawData),
                     period: metadata?.period || 'N/A'
                 };
-            
             case 'reachFrequency':
                 return {
                     totalReach: calculateTotalReach(rawData),
@@ -42,7 +35,6 @@ export default function DashboardOverview({ data, reportType, metadata }) {
                     totalContacts: calculateTotalContacts(rawData),
                     uniqueReach: calculateUniqueReach(rawData)
                 };
-            
             case 'daypartAnalysis':
                 return {
                     daypartsAnalyzed: countUniqueDayparts(rawData),
@@ -50,17 +42,15 @@ export default function DashboardOverview({ data, reportType, metadata }) {
                     avgPerformance: calculateAvgDaypartPerformance(rawData),
                     channelsAnalyzed: countUniqueChannels(rawData)
                 };
-            
             case 'deepAnalysis':
                 return {
                     dataPoints: rawData?.length || 0,
                     variables: metadata?.variables?.length || 0,
                     channelsAnalyzed: countUniqueChannels(rawData),
-                    dateRange: metadata?.date_from && metadata?.date_to 
-                        ? `${metadata.date_from} to ${metadata.date_to}` 
+                    dateRange: metadata?.date_from && metadata?.date_to
+                        ? `${metadata.date_from} to ${metadata.date_to}`
                         : 'N/A'
                 };
-            
             default:
                 return null;
         }
@@ -68,188 +58,66 @@ export default function DashboardOverview({ data, reportType, metadata }) {
 
     if (!quickStats) return null;
 
-    // Render stats cards based on report type
     const renderSpotlistStats = () => (
         <>
-            <StatCard
-                icon={Activity}
-                label="Total Spots"
-                value={quickStats.totalSpots.toLocaleString()}
-                trend={null}
-                color="#3B82F6"
-            />
+            <StatCard icon={Activity} label="Total Spots" value={quickStats.totalSpots.toLocaleString()} color="blue" />
             <StatCard
                 icon={AlertTriangle}
                 label="Double Bookings"
                 value={quickStats.doubleBookings.toLocaleString()}
                 subtitle={`${((quickStats.doubleBookings / quickStats.totalSpots) * 100).toFixed(1)}% of spots`}
-                trend={null}
-                color={quickStats.doubleBookings > 0 ? "#EF4444" : "#10B981"}
+                color={quickStats.doubleBookings > 0 ? "red" : "green"}
             />
             <StatCard
                 icon={DollarSign}
                 label="Total Budget"
                 value={`€${quickStats.totalBudget.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                 subtitle={`€${quickStats.avgCostPerSpot} avg per spot`}
-                trend={null}
-                color="#10B981"
+                color="green"
             />
             <StatCard
                 icon={Target}
                 label="Risk Score"
                 value={quickStats.riskScore}
                 subtitle={getRiskLabel(quickStats.riskScore)}
-                trend={null}
-                color={getRiskColor(quickStats.riskScore)}
+                color={getRiskColorName(quickStats.riskScore)}
             />
         </>
     );
 
     const renderTopTenStats = () => (
         <>
-            <StatCard
-                icon={BarChart3}
-                label="Top Entity"
-                value={quickStats.topEntity}
-                subtitle={`#1 in ${metadata?.subtype || 'ranking'}`}
-                trend={null}
-                color="#3B82F6"
-            />
-            <StatCard
-                icon={TrendingUp}
-                label="Top Value"
-                value={quickStats.topValue}
-                subtitle="Leading metric"
-                trend={null}
-                color="#10B981"
-            />
-            <StatCard
-                icon={Clock}
-                label="Period"
-                value={quickStats.period}
-                subtitle="Analysis timeframe"
-                trend={null}
-                color="#6366F1"
-            />
-            <StatCard
-                icon={Activity}
-                label="Total Results"
-                value={quickStats.totalSpots}
-                subtitle="Top 10 items"
-                trend={null}
-                color="#8B5CF6"
-            />
+            <StatCard icon={BarChart3} label="Top Entity" value={quickStats.topEntity} subtitle={`#1 in ${metadata?.subtype || 'ranking'}`} color="blue" />
+            <StatCard icon={TrendingUp} label="Top Value" value={quickStats.topValue} subtitle="Leading metric" color="green" />
+            <StatCard icon={Clock} label="Period" value={quickStats.period} subtitle="Analysis timeframe" color="purple" />
+            <StatCard icon={Activity} label="Total Results" value={quickStats.totalSpots} subtitle="Top 10 items" color="violet" />
         </>
     );
 
     const renderReachFrequencyStats = () => (
         <>
-            <StatCard
-                icon={Users}
-                label="Total Reach"
-                value={quickStats.totalReach ? `${(quickStats.totalReach * 100).toFixed(1)}%` : 'N/A'}
-                subtitle="Cumulative reach"
-                trend={null}
-                color="#3B82F6"
-            />
-            <StatCard
-                icon={Activity}
-                label="Avg Frequency"
-                value={quickStats.avgFrequency ? quickStats.avgFrequency.toFixed(2) : 'N/A'}
-                subtitle="Average frequency"
-                trend={null}
-                color="#10B981"
-            />
-            <StatCard
-                icon={Target}
-                label="Total Contacts"
-                value={quickStats.totalContacts ? quickStats.totalContacts.toLocaleString() : 'N/A'}
-                subtitle="Total ad contacts"
-                trend={null}
-                color="#F59E0B"
-            />
-            <StatCard
-                icon={Users}
-                label="Unique Reach"
-                value={quickStats.uniqueReach ? `${(quickStats.uniqueReach * 100).toFixed(1)}%` : 'N/A'}
-                subtitle="Net reach"
-                trend={null}
-                color="#8B5CF6"
-            />
+            <StatCard icon={Users} label="Total Reach" value={quickStats.totalReach ? `${(quickStats.totalReach * 100).toFixed(1)}%` : 'N/A'} subtitle="Cumulative reach" color="blue" />
+            <StatCard icon={Activity} label="Avg Frequency" value={quickStats.avgFrequency ? quickStats.avgFrequency.toFixed(2) : 'N/A'} subtitle="Average frequency" color="green" />
+            <StatCard icon={Target} label="Total Contacts" value={quickStats.totalContacts ? quickStats.totalContacts.toLocaleString() : 'N/A'} subtitle="Total ad contacts" color="amber" />
+            <StatCard icon={Users} label="Unique Reach" value={quickStats.uniqueReach ? `${(quickStats.uniqueReach * 100).toFixed(1)}%` : 'N/A'} subtitle="Net reach" color="violet" />
         </>
     );
 
     const renderDaypartStats = () => (
         <>
-            <StatCard
-                icon={Clock}
-                label="Dayparts Analyzed"
-                value={quickStats.daypartsAnalyzed}
-                subtitle="Time segments"
-                trend={null}
-                color="#3B82F6"
-            />
-            <StatCard
-                icon={TrendingUp}
-                label="Top Daypart"
-                value={quickStats.topDaypart || 'N/A'}
-                subtitle="Best performing"
-                trend={null}
-                color="#10B981"
-            />
-            <StatCard
-                icon={BarChart3}
-                label="Avg Performance"
-                value={quickStats.avgPerformance || 'N/A'}
-                subtitle="Average metric"
-                trend={null}
-                color="#F59E0B"
-            />
-            <StatCard
-                icon={Activity}
-                label="Channels"
-                value={quickStats.channelsAnalyzed}
-                subtitle="Channels analyzed"
-                trend={null}
-                color="#8B5CF6"
-            />
+            <StatCard icon={Clock} label="Dayparts Analyzed" value={quickStats.daypartsAnalyzed} subtitle="Time segments" color="blue" />
+            <StatCard icon={TrendingUp} label="Top Daypart" value={quickStats.topDaypart || 'N/A'} subtitle="Best performing" color="green" />
+            <StatCard icon={BarChart3} label="Avg Performance" value={quickStats.avgPerformance || 'N/A'} subtitle="Average metric" color="amber" />
+            <StatCard icon={Activity} label="Channels" value={quickStats.channelsAnalyzed} subtitle="Channels analyzed" color="violet" />
         </>
     );
 
     const renderDeepAnalysisStats = () => (
         <>
-            <StatCard
-                icon={Activity}
-                label="Data Points"
-                value={quickStats.dataPoints.toLocaleString()}
-                subtitle="Total records"
-                trend={null}
-                color="#3B82F6"
-            />
-            <StatCard
-                icon={BarChart3}
-                label="Variables"
-                value={quickStats.variables}
-                subtitle="Metrics analyzed"
-                trend={null}
-                color="#10B981"
-            />
-            <StatCard
-                icon={Target}
-                label="Channels"
-                value={quickStats.channelsAnalyzed}
-                subtitle="Channels analyzed"
-                trend={null}
-                color="#F59E0B"
-            />
-            <StatCard
-                icon={Clock}
-                label="Date Range"
-                value={quickStats.dateRange}
-                subtitle="Analysis period"
-                trend={null}
-                color="#8B5CF6"
-            />
+            <StatCard icon={Activity} label="Data Points" value={quickStats.dataPoints.toLocaleString()} subtitle="Total records" color="blue" />
+            <StatCard icon={BarChart3} label="Variables" value={quickStats.variables} subtitle="Metrics analyzed" color="green" />
+            <StatCard icon={Target} label="Channels" value={quickStats.channelsAnalyzed} subtitle="Channels analyzed" color="amber" />
+            <StatCard icon={Clock} label="Date Range" value={quickStats.dateRange} subtitle="Analysis period" color="violet" />
         </>
     );
 
@@ -265,89 +133,57 @@ export default function DashboardOverview({ data, reportType, metadata }) {
     };
 
     return (
-        <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-            gap: 'var(--space-m)',
-            marginBottom: 'var(--space-xl)'
-        }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {renderStats()}
         </div>
     );
 }
 
-// Stat Card Component
-function StatCard({ icon: Icon, label, value, subtitle, trend, color }) {
+// Color mappings for Tailwind
+const colorClasses = {
+    blue: { bg: 'bg-blue-100 dark:bg-blue-950/50', text: 'text-blue-500', border: 'border-l-blue-500' },
+    green: { bg: 'bg-emerald-100 dark:bg-emerald-950/50', text: 'text-emerald-500', border: 'border-l-emerald-500' },
+    red: { bg: 'bg-red-100 dark:bg-red-950/50', text: 'text-red-500', border: 'border-l-red-500' },
+    amber: { bg: 'bg-amber-100 dark:bg-amber-950/50', text: 'text-amber-500', border: 'border-l-amber-500' },
+    purple: { bg: 'bg-purple-100 dark:bg-purple-950/50', text: 'text-purple-500', border: 'border-l-purple-500' },
+    violet: { bg: 'bg-violet-100 dark:bg-violet-950/50', text: 'text-violet-500', border: 'border-l-violet-500' },
+};
+
+function StatCard({ icon: Icon, label, value, subtitle, color = 'blue' }) {
+    const colors = colorClasses[color] || colorClasses.blue;
+
     return (
-        <div className="card" style={{
-            padding: 'var(--space-m)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 'var(--space-xs)',
-            borderLeft: `4px solid ${color}`,
-            transition: 'transform 0.2s, box-shadow 0.2s'
-        }}
-        onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-        }}
-        onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = 'none';
-        }}
-        >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)' }}>
-                <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '8px',
-                    backgroundColor: `${color}15`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                }}>
-                    <Icon size={20} style={{ color }} />
+        <Card className={cn(
+            "p-4 flex flex-col gap-1 border-l-4 transition-all hover:-translate-y-0.5 hover:shadow-md",
+            colors.border
+        )}>
+            <div className="flex items-center gap-3">
+                <div className={cn("size-10 rounded-lg flex items-center justify-center", colors.bg)}>
+                    <Icon className={cn("size-5", colors.text)} />
                 </div>
-                <div style={{ flex: 1 }}>
-                    <div style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--text-secondary)',
-                        fontWeight: 'var(--font-weight-medium)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                    }}>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
                         {label}
-                    </div>
-                    <div style={{
-                        fontSize: 'var(--font-size-xl)',
-                        fontWeight: 'var(--font-weight-bold)',
-                        color: 'var(--text-primary)',
-                        marginTop: '2px'
-                    }}>
+                    </p>
+                    <p className="text-xl font-bold text-foreground mt-0.5 truncate">
                         {value}
-                    </div>
+                    </p>
                     {subtitle && (
-                        <div style={{
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-tertiary)',
-                            marginTop: '4px'
-                        }}>
+                        <p className="text-xs text-muted-foreground mt-1">
                             {subtitle}
-                        </div>
+                        </p>
                     )}
                 </div>
             </div>
-        </div>
+        </Card>
     );
 }
 
 // Helper functions
 function calculateRiskScore(metrics, window_summaries) {
     if (!metrics || !window_summaries) return 'Low';
-    
     const doubleBookingRate = metrics.double_spots / metrics.total_spots;
     const budgetRisk = metrics.double_cost / metrics.total_cost;
-    
     if (doubleBookingRate > 0.5 || budgetRisk > 0.5) return 'Very High';
     if (doubleBookingRate > 0.3 || budgetRisk > 0.3) return 'High';
     if (doubleBookingRate > 0.1 || budgetRisk > 0.1) return 'Medium';
@@ -355,23 +191,13 @@ function calculateRiskScore(metrics, window_summaries) {
 }
 
 function getRiskLabel(score) {
-    const labels = {
-        'Very High': 'Critical attention needed',
-        'High': 'Review recommended',
-        'Medium': 'Monitor closely',
-        'Low': 'Within acceptable range'
-    };
+    const labels = { 'Very High': 'Critical attention needed', 'High': 'Review recommended', 'Medium': 'Monitor closely', 'Low': 'Within acceptable range' };
     return labels[score] || 'Unknown';
 }
 
-function getRiskColor(score) {
-    const colors = {
-        'Very High': '#EF4444',
-        'High': '#F59E0B',
-        'Medium': '#3B82F6',
-        'Low': '#10B981'
-    };
-    return colors[score] || '#6B7280';
+function getRiskColorName(score) {
+    const colors = { 'Very High': 'red', 'High': 'amber', 'Medium': 'blue', 'Low': 'green' };
+    return colors[score] || 'blue';
 }
 
 function getTopChannel(data) {
@@ -379,9 +205,7 @@ function getTopChannel(data) {
     const channelCounts = {};
     data.forEach(item => {
         const channel = item.channel || item.channel_name || item.channel_id;
-        if (channel) {
-            channelCounts[channel] = (channelCounts[channel] || 0) + 1;
-        }
+        if (channel) channelCounts[channel] = (channelCounts[channel] || 0) + 1;
     });
     const sorted = Object.entries(channelCounts).sort((a, b) => b[1] - a[1]);
     return sorted[0]?.[0] || 'N/A';
@@ -390,11 +214,10 @@ function getTopChannel(data) {
 function getTopValue(data) {
     if (!data || !Array.isArray(data) || data.length === 0) return 'N/A';
     const first = data[0];
-    // Try to find a numeric value field
     const valueFields = ['xrp', 'share', 'value', 'score', 'reach', 'amr-perc'];
     for (const field of valueFields) {
         if (first[field] !== undefined) {
-            return typeof first[field] === 'number' 
+            return typeof first[field] === 'number'
                 ? first[field].toLocaleString(undefined, { maximumFractionDigits: 2 })
                 : first[field];
         }
@@ -404,39 +227,29 @@ function getTopValue(data) {
 
 function calculateTotalReach(data) {
     if (!data || !Array.isArray(data)) return null;
-    // Sum reach values if available
-    const reachValues = data
-        .map(item => item['reach (%)'] || item.reach || item['reach'] || 0)
-        .filter(v => typeof v === 'number');
+    const reachValues = data.map(item => item['reach (%)'] || item.reach || 0).filter(v => typeof v === 'number');
     return reachValues.length > 0 ? reachValues.reduce((a, b) => a + b, 0) / reachValues.length : null;
 }
 
 function calculateAvgFrequency(data) {
     if (!data || !Array.isArray(data)) return null;
-    const freqValues = data
-        .map(item => item.frequency || item.freq || 0)
-        .filter(v => typeof v === 'number');
+    const freqValues = data.map(item => item.frequency || item.freq || 0).filter(v => typeof v === 'number');
     return freqValues.length > 0 ? freqValues.reduce((a, b) => a + b, 0) / freqValues.length : null;
 }
 
 function calculateTotalContacts(data) {
     if (!data || !Array.isArray(data)) return null;
-    const contacts = data
-        .map(item => item.contacts || item.contact || 0)
-        .filter(v => typeof v === 'number');
+    const contacts = data.map(item => item.contacts || item.contact || 0).filter(v => typeof v === 'number');
     return contacts.length > 0 ? contacts.reduce((a, b) => a + b, 0) : null;
 }
 
-function calculateUniqueReach(data) {
-    // Similar to total reach but for unique reach
-    return calculateTotalReach(data);
-}
+function calculateUniqueReach(data) { return calculateTotalReach(data); }
 
 function countUniqueDayparts(data) {
     if (!data || !Array.isArray(data)) return 0;
     const dayparts = new Set();
     data.forEach(item => {
-        const daypart = item.daypart || item.daypart_name || item['daypart'];
+        const daypart = item.daypart || item.daypart_name;
         if (daypart) dayparts.add(daypart);
     });
     return dayparts.size;
@@ -446,7 +259,7 @@ function getTopDaypart(data) {
     if (!data || !Array.isArray(data)) return null;
     const daypartPerformance = {};
     data.forEach(item => {
-        const daypart = item.daypart || item.daypart_name || item['daypart'];
+        const daypart = item.daypart || item.daypart_name;
         if (daypart) {
             const value = item['reach (%)'] || item.share || item['amr-perc'] || 0;
             if (!daypartPerformance[daypart]) daypartPerformance[daypart] = 0;
@@ -459,12 +272,8 @@ function getTopDaypart(data) {
 
 function calculateAvgDaypartPerformance(data) {
     if (!data || !Array.isArray(data)) return null;
-    const values = data
-        .map(item => item['reach (%)'] || item.share || item['amr-perc'] || 0)
-        .filter(v => typeof v === 'number');
-    return values.length > 0 
-        ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) + '%'
-        : null;
+    const values = data.map(item => item['reach (%)'] || item.share || item['amr-perc'] || 0).filter(v => typeof v === 'number');
+    return values.length > 0 ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(2) + '%' : null;
 }
 
 function countUniqueChannels(data) {
@@ -476,6 +285,3 @@ function countUniqueChannels(data) {
     });
     return channels.size;
 }
-
-
-

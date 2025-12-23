@@ -1,6 +1,25 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronUp, Filter, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Filter, X, Settings2 } from 'lucide-react';
 import { getDisplayName } from '../utils/metadataEnricher';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuCheckboxItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const DEFAULT_COLUMNS = {
+    channel: true,
+    date: true,
+    time: true,
+    spend: true,
+    creative: true,
+};
 
 export default function DoubleBookingsTable({ data, fieldMap }) {
     const [sortColumn, setSortColumn] = useState(null);
@@ -8,58 +27,60 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
     const [filterChannel, setFilterChannel] = useState('');
     const [filterDate, setFilterDate] = useState('');
     const [expandedRows, setExpandedRows] = useState(new Set());
+    const [visibleColumns, setVisibleColumns] = useState(() => {
+        const saved = localStorage.getItem('tableColumns');
+        return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('tableColumns', JSON.stringify(visibleColumns));
+    }, [visibleColumns]);
+
+    const toggleColumn = (column) => {
+        setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }));
+    };
 
     if (!data || data.length === 0) {
         return (
-            <div style={{
-                padding: 'var(--space-l)',
-                textAlign: 'center',
-                color: 'var(--text-tertiary)'
-            }}>
+            <div className="p-6 text-center text-muted-foreground">
                 No double bookings found.
             </div>
         );
     }
 
-    // Get unique channels for filter (use enriched names if available)
     const channels = [...new Set(data.map(item => {
-        const channel = getDisplayName(item, 'channel') || 
-                       item[fieldMap?.program_column] || 
-                       item.program_original || 
-                       item.program_norm || 
-                       item.channel_display ||
-                       'Unknown';
-        return channel;
+        return getDisplayName(item, 'channel') ||
+            item[fieldMap?.program_column] ||
+            item.program_original ||
+            item.program_norm ||
+            item.channel_display ||
+            'Unknown';
     }))].sort();
 
-    // Filter data (use enriched names if available)
     let filteredData = data.filter(item => {
-        const channel = getDisplayName(item, 'channel') || 
-                       item[fieldMap?.program_column] || 
-                       item.program_original || 
-                       item.program_norm || 
-                       item.channel_display ||
-                       'Unknown';
+        const channel = getDisplayName(item, 'channel') ||
+            item[fieldMap?.program_column] ||
+            item.program_original ||
+            item.program_norm ||
+            item.channel_display ||
+            'Unknown';
         const date = item.timestamp ? item.timestamp.split('T')[0] : '';
-        
+
         if (filterChannel && channel !== filterChannel) return false;
         if (filterDate && date !== filterDate) return false;
         return true;
     });
 
-    // Sort data
     if (sortColumn) {
         filteredData = [...filteredData].sort((a, b) => {
             let aVal = a[sortColumn];
             let bVal = b[sortColumn];
 
-            // Handle timestamp sorting
             if (sortColumn === 'timestamp') {
                 aVal = aVal ? new Date(aVal).getTime() : 0;
                 bVal = bVal ? new Date(bVal).getTime() : 0;
             }
 
-            // Handle numeric sorting
             if (sortColumn.includes('cost') || sortColumn.includes('Spend')) {
                 aVal = parseFloat(aVal) || 0;
                 bVal = parseFloat(bVal) || 0;
@@ -94,74 +115,46 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
         if (!timestamp) return 'N/A';
         const date = new Date(timestamp);
         return date.toLocaleString('en-US', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit'
         });
     };
 
-    const formatDate = (timestamp) => {
-        if (!timestamp) return 'N/A';
-        return timestamp.split('T')[0];
-    };
+    const formatDate = (timestamp) => timestamp ? timestamp.split('T')[0] : 'N/A';
 
     const formatTime = (timestamp) => {
         if (!timestamp) return 'N/A';
         const date = new Date(timestamp);
-        return date.toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     };
 
-    const getCost = (item) => {
-        return item.cost_numeric || item[fieldMap?.cost_column] || item.Spend || 0;
-    };
+    const getCost = (item) => item.cost_numeric || item[fieldMap?.cost_column] || item.Spend || 0;
 
     const getChannel = (item) => {
-        return getDisplayName(item, 'channel') || 
-               item[fieldMap?.program_column] || 
-               item.program_original || 
-               item.program_norm || 
-               item.Channel || 
-               item.channel_display ||
-               'Unknown';
+        return getDisplayName(item, 'channel') ||
+            item[fieldMap?.program_column] ||
+            item.program_original ||
+            item.program_norm ||
+            item.Channel ||
+            item.channel_display ||
+            'Unknown';
     };
 
-    const getCreative = (item) => {
-        return item[fieldMap?.creative_column] || item.Claim || item.creative_norm || 'N/A';
-    };
+    const getCreative = (item) => item[fieldMap?.creative_column] || item.Claim || item.creative_norm || 'N/A';
 
     return (
         <div>
             {/* Filters */}
-            <div style={{
-                padding: 'var(--space-m)',
-                borderBottom: '1px solid var(--border-subtle)',
-                display: 'flex',
-                gap: 'var(--space-m)',
-                flexWrap: 'wrap',
-                alignItems: 'center'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-s)' }}>
-                    <Filter size={16} style={{ color: 'var(--text-secondary)' }} />
-                    <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>Filter:</span>
+            <div className="px-4 py-3 border-b flex flex-wrap gap-4 items-center">
+                <div className="flex items-center gap-2">
+                    <Filter className="size-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Filter:</span>
                 </div>
-                
+
                 <select
                     value={filterChannel}
                     onChange={(e) => setFilterChannel(e.target.value)}
-                    style={{
-                        padding: '8px 12px',
-                        fontSize: 'var(--font-size-sm)',
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        color: 'var(--text-primary)',
-                        cursor: 'pointer'
-                    }}
+                    className="px-3 py-2 text-sm bg-muted border rounded-md"
                 >
                     <option value="">All Channels</option>
                     {channels.map(ch => (
@@ -169,207 +162,184 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                     ))}
                 </select>
 
-                <input
+                <Input
                     type="date"
                     value={filterDate}
                     onChange={(e) => setFilterDate(e.target.value)}
-                    placeholder="Filter by date"
-                    style={{
-                        padding: '8px 12px',
-                        fontSize: 'var(--font-size-sm)',
-                        background: 'var(--bg-secondary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '6px',
-                        color: 'var(--text-primary)'
-                    }}
+                    className="w-auto"
                 />
 
                 {(filterChannel || filterDate) && (
-                    <button
-                        onClick={() => {
-                            setFilterChannel('');
-                            setFilterDate('');
-                        }}
-                        style={{
-                            padding: '8px 12px',
-                            fontSize: 'var(--font-size-sm)',
-                            background: 'transparent',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '6px',
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 'var(--space-xs)'
-                        }}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setFilterChannel(''); setFilterDate(''); }}
                     >
-                        <X size={14} />
+                        <X className="size-4" />
                         Clear Filters
-                    </button>
+                    </Button>
                 )}
 
-                <div style={{ marginLeft: 'auto', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
-                    Showing {filteredData.length} of {data.length} double bookings
+                <div className="ml-auto flex items-center gap-3">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <Settings2 className="size-4" />
+                                Columns
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Toggle Columns</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuCheckboxItem checked={visibleColumns.channel} onCheckedChange={() => toggleColumn('channel')}>
+                                Channel
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibleColumns.date} onCheckedChange={() => toggleColumn('date')}>
+                                Date
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibleColumns.time} onCheckedChange={() => toggleColumn('time')}>
+                                Time
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibleColumns.spend} onCheckedChange={() => toggleColumn('spend')}>
+                                Spend
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuCheckboxItem checked={visibleColumns.creative} onCheckedChange={() => toggleColumn('creative')}>
+                                Creative
+                            </DropdownMenuCheckboxItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <span className="text-sm text-muted-foreground">
+                        Showing {filteredData.length} of {data.length}
+                    </span>
                 </div>
             </div>
 
             {/* Table */}
-            <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%' }}>
+            <div className="overflow-x-auto">
+                <table className="w-full">
                     <thead>
-                        <tr>
-                            <th style={{ width: '40px' }}></th>
-                            <th 
-                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                        <tr className="border-b-2 border-border">
+                            <th className="w-10 px-4 py-3"></th>
+                            <th
+                                className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none hover:bg-muted"
                                 onClick={() => handleSort('program_original')}
                             >
                                 Channel {sortColumn === 'program_original' && (sortDirection === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th 
-                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                            <th
+                                className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none hover:bg-muted"
                                 onClick={() => handleSort('timestamp')}
                             >
                                 Date {sortColumn === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th>Time</th>
-                            <th 
-                                style={{ cursor: 'pointer', userSelect: 'none' }}
+                            <th className="px-4 py-3 text-left text-sm font-semibold">Time</th>
+                            <th
+                                className="px-4 py-3 text-right text-sm font-semibold cursor-pointer select-none hover:bg-muted"
                                 onClick={() => handleSort('cost_numeric')}
                             >
                                 Spend {sortColumn === 'cost_numeric' && (sortDirection === 'asc' ? '↑' : '↓')}
                             </th>
-                            <th>Creative</th>
+                            <th className="px-4 py-3 text-left text-sm font-semibold">Creative</th>
                         </tr>
                     </thead>
                     <tbody>
                         {filteredData.map((item, index) => {
                             const isExpanded = expandedRows.has(index);
-                            
-                            // Find potential matched spots (same channel, same day, within time window)
+
                             const matchedSpots = filteredData.filter(other => {
                                 if (other === item) return false;
-                                const itemChannel = getChannel(item);
-                                const otherChannel = getChannel(other);
-                                if (itemChannel !== otherChannel) return false;
-                                
-                                const itemDate = formatDate(item.timestamp);
-                                const otherDate = formatDate(other.timestamp);
-                                if (itemDate !== otherDate) return false;
-                                
-                                const itemTime = new Date(item.timestamp).getTime();
-                                const otherTime = new Date(other.timestamp).getTime();
-                                const diffMinutes = Math.abs(itemTime - otherTime) / (1000 * 60);
-                                
-                                // Within 2 hours window (reasonable for double bookings)
-                                return diffMinutes <= 120;
+                                if (getChannel(item) !== getChannel(other)) return false;
+                                if (formatDate(item.timestamp) !== formatDate(other.timestamp)) return false;
+                                const timeDiff = Math.abs(
+                                    new Date(item.timestamp).getTime() - new Date(other.timestamp).getTime()
+                                ) / (1000 * 60);
+                                return timeDiff <= 120;
                             });
 
                             return (
                                 <>
-                                    <tr key={index} style={{ cursor: 'pointer' }} onClick={() => toggleRow(index)}>
-                                        <td>
+                                    <tr
+                                        key={index}
+                                        className={cn(
+                                            "cursor-pointer border-b hover:bg-muted/50 transition-colors",
+                                            index % 2 === 1 && "bg-muted/30"
+                                        )}
+                                        onClick={() => toggleRow(index)}
+                                    >
+                                        <td className="px-4 py-3">
                                             {isExpanded ? (
-                                                <ChevronUp size={16} style={{ color: 'var(--text-secondary)' }} />
+                                                <ChevronUp className="size-4 text-muted-foreground" />
                                             ) : (
-                                                <ChevronDown size={16} style={{ color: 'var(--text-secondary)' }} />
+                                                <ChevronDown className="size-4 text-muted-foreground" />
                                             )}
                                         </td>
-                                        <td style={{ fontWeight: 600 }}>{getChannel(item)}</td>
-                                        <td>{formatDate(item.timestamp)}</td>
-                                        <td>{formatTime(item.timestamp)}</td>
-                                        <td>€{getCost(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                                        <td style={{ maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                            {getCreative(item)}
+                                        <td className="px-4 py-3 font-semibold">{getChannel(item)}</td>
+                                        <td className="px-4 py-3">{formatDate(item.timestamp)}</td>
+                                        <td className="px-4 py-3">{formatTime(item.timestamp)}</td>
+                                        <td className="px-4 py-3 text-right tabular-nums">
+                                            €{getCost(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
+                                        <td className="px-4 py-3 max-w-[200px] truncate">{getCreative(item)}</td>
                                     </tr>
                                     {isExpanded && (
                                         <tr key={`${index}-details`}>
-                                            <td colSpan={6} style={{ 
-                                                padding: 'var(--space-m)', 
-                                                backgroundColor: 'var(--bg-tertiary)',
-                                                borderTop: '1px solid var(--border-subtle)'
-                                            }}>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-m)' }}>
+                                            <td colSpan={6} className="p-4 bg-muted/50 border-t">
+                                                <div className="flex flex-col gap-4">
                                                     <div>
-                                                        <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
-                                                            Spot Details:
-                                                        </strong>
-                                                        <div style={{ 
-                                                            marginTop: 'var(--space-xs)', 
-                                                            fontSize: 'var(--font-size-sm)',
-                                                            color: 'var(--text-secondary)',
-                                                            display: 'grid',
-                                                            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                                                            gap: 'var(--space-s)'
-                                                        }}>
+                                                        <strong className="text-sm">Spot Details:</strong>
+                                                        <div className="mt-2 text-sm grid grid-cols-1 md:grid-cols-3 gap-2">
                                                             <div>
-                                                                <span style={{ color: 'var(--text-tertiary)' }}>EPG Name: </span>
+                                                                <span className="text-muted-foreground">EPG Name: </span>
                                                                 {item['EPG name'] || item[fieldMap?.sendung_long] || 'N/A'}
                                                             </div>
                                                             <div>
-                                                                <span style={{ color: 'var(--text-tertiary)' }}>Full Timestamp: </span>
+                                                                <span className="text-muted-foreground">Full Timestamp: </span>
                                                                 {formatTimestamp(item.timestamp)}
                                                             </div>
                                                             <div>
-                                                                <span style={{ color: 'var(--text-tertiary)' }}>Creative: </span>
+                                                                <span className="text-muted-foreground">Creative: </span>
                                                                 {getCreative(item)}
                                                             </div>
                                                         </div>
                                                     </div>
-                                                    
+
                                                     {matchedSpots.length > 0 && (
                                                         <div>
-                                                            <strong style={{ color: 'var(--text-primary)', fontSize: 'var(--font-size-sm)' }}>
+                                                            <strong className="text-sm">
                                                                 Potential Matched Spots ({matchedSpots.length}):
                                                             </strong>
-                                                            <div style={{ 
-                                                                marginTop: 'var(--space-xs)',
-                                                                display: 'flex',
-                                                                flexDirection: 'column',
-                                                                gap: 'var(--space-xs)'
-                                                            }}>
+                                                            <div className="mt-2 flex flex-col gap-2">
                                                                 {matchedSpots.slice(0, 5).map((match, matchIndex) => {
                                                                     const timeDiff = Math.abs(
-                                                                        new Date(item.timestamp).getTime() - 
+                                                                        new Date(item.timestamp).getTime() -
                                                                         new Date(match.timestamp).getTime()
                                                                     ) / (1000 * 60);
                                                                     return (
-                                                                        <div key={matchIndex} style={{
-                                                                            padding: 'var(--space-s)',
-                                                                            backgroundColor: 'var(--bg-secondary)',
-                                                                            borderRadius: '6px',
-                                                                            fontSize: 'var(--font-size-sm)',
-                                                                            display: 'grid',
-                                                                            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                                                                            gap: 'var(--space-s)'
-                                                                        }}>
+                                                                        <div key={matchIndex} className="p-3 bg-background rounded-md border text-sm grid grid-cols-2 md:grid-cols-4 gap-2">
                                                                             <div>
-                                                                                <span style={{ color: 'var(--text-tertiary)' }}>Time: </span>
+                                                                                <span className="text-muted-foreground">Time: </span>
                                                                                 {formatTime(match.timestamp)}
                                                                             </div>
                                                                             <div>
-                                                                                <span style={{ color: 'var(--text-tertiary)' }}>Time Diff: </span>
+                                                                                <span className="text-muted-foreground">Time Diff: </span>
                                                                                 {Math.round(timeDiff)} min
                                                                             </div>
                                                                             <div>
-                                                                                <span style={{ color: 'var(--text-tertiary)' }}>Spend: </span>
+                                                                                <span className="text-muted-foreground">Spend: </span>
                                                                                 €{getCost(match).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                                             </div>
                                                                             <div>
-                                                                                <span style={{ color: 'var(--text-tertiary)' }}>Creative: </span>
+                                                                                <span className="text-muted-foreground">Creative: </span>
                                                                                 {getCreative(match)}
                                                                             </div>
                                                                         </div>
                                                                     );
                                                                 })}
                                                                 {matchedSpots.length > 5 && (
-                                                                    <div style={{ 
-                                                                        fontSize: 'var(--font-size-xs)', 
-                                                                        color: 'var(--text-tertiary)',
-                                                                        fontStyle: 'italic'
-                                                                    }}>
+                                                                    <p className="text-xs text-muted-foreground italic">
                                                                         ... and {matchedSpots.length - 5} more
-                                                                    </div>
+                                                                    </p>
                                                                 )}
                                                             </div>
                                                         </div>
@@ -386,15 +356,10 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
             </div>
 
             {filteredData.length === 0 && (
-                <div style={{
-                    padding: 'var(--space-l)',
-                    textAlign: 'center',
-                    color: 'var(--text-tertiary)'
-                }}>
+                <div className="p-6 text-center text-muted-foreground">
                     No double bookings match the selected filters.
                 </div>
             )}
         </div>
     );
 }
-

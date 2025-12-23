@@ -1,13 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Tag, Search } from 'lucide-react';
+import { Tag, Search, X, Check } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
-export default function BrandSelector({ 
-    companyId, 
-    brandIds, 
+export default function BrandSelector({
+    companyId,
+    brandIds,
     setBrandIds,
-    disabled = false 
+    disabled = false
 }) {
     const [brands, setBrands] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -15,7 +19,6 @@ export default function BrandSelector({
     const [isOpen, setIsOpen] = useState(false);
     const [error, setError] = useState(null);
 
-    // Fetch brands when company ID changes
     useEffect(() => {
         if (!companyId) {
             setBrands([]);
@@ -48,7 +51,6 @@ export default function BrandSelector({
         fetchBrands();
     }, [companyId, searchQuery]);
 
-    // Filter brands based on search query
     const filteredBrands = useMemo(() => {
         if (!searchQuery.trim()) {
             return brands;
@@ -82,100 +84,45 @@ export default function BrandSelector({
     }, [brands, brandIds]);
 
     return (
-        <div style={{ position: 'relative' }}>
-            <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-s)',
-                marginBottom: 'var(--space-s)',
-                fontSize: 'var(--font-size-sm)',
-                fontWeight: 500,
-                color: 'var(--text-primary)'
-            }}>
-                <Tag size={16} />
+        <div className="relative">
+            <Label className="flex items-center gap-2 mb-2">
+                <Tag className="size-4" />
                 Brands {companyId ? '' : '(Select company first)'}
-            </label>
-            
+            </Label>
+
             {!companyId && (
-                <div style={{
-                    padding: 'var(--space-s)',
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--text-tertiary)',
-                    fontStyle: 'italic',
-                    marginBottom: 'var(--space-s)'
-                }}>
+                <p className="text-xs text-muted-foreground italic mb-2 p-2">
                     Please select a company first to load brands
-                </div>
+                </p>
             )}
 
             {companyId && (
                 <>
                     {/* Selected Brands Display */}
                     {selectedBrands.length > 0 && (
-                        <div style={{
-                            display: 'flex',
-                            flexWrap: 'wrap',
-                            gap: 'var(--space-xs)',
-                            marginBottom: 'var(--space-s)',
-                            padding: 'var(--space-xs)',
-                            backgroundColor: 'var(--bg-secondary)',
-                            borderRadius: '6px',
-                            minHeight: '32px'
-                        }}>
+                        <div className="flex flex-wrap gap-1 mb-2 p-2 bg-muted rounded-md min-h-8">
                             {selectedBrands.map(brand => {
                                 const brandId = brand.value || brand.id;
                                 const name = brand.caption || brand.name || brand.label || 'Unknown';
                                 return (
-                                    <span
-                                        key={brandId}
-                                        style={{
-                                            display: 'inline-flex',
-                                            alignItems: 'center',
-                                            gap: '4px',
-                                            padding: '4px 8px',
-                                            backgroundColor: 'var(--accent-primary)',
-                                            color: 'white',
-                                            borderRadius: '4px',
-                                            fontSize: 'var(--font-size-xs)',
-                                            fontWeight: 500
-                                        }}
-                                    >
+                                    <Badge key={brandId} className="gap-1">
                                         {name}
                                         <button
                                             onClick={() => handleRemoveBrand(brandId)}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: 'white',
-                                                cursor: 'pointer',
-                                                padding: 0,
-                                                marginLeft: '4px',
-                                                fontSize: '14px',
-                                                lineHeight: 1
-                                            }}
+                                            className="ml-1 hover:bg-primary-foreground/20 rounded-full"
                                         >
-                                            ×
+                                            <X className="size-3" />
                                         </button>
-                                    </span>
+                                    </Badge>
                                 );
                             })}
                         </div>
                     )}
 
                     {/* Search Input */}
-                    <div style={{ position: 'relative' }}>
-                        <Search 
-                            size={16} 
-                            style={{ 
-                                position: 'absolute', 
-                                left: '12px', 
-                                top: '50%', 
-                                transform: 'translateY(-50%)',
-                                color: 'var(--text-tertiary)',
-                                pointerEvents: 'none'
-                            }} 
-                        />
-                        <input
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+                        <Input
                             type="text"
                             placeholder={loading ? "Loading brands..." : "Search brands..."}
                             value={searchQuery}
@@ -187,44 +134,20 @@ export default function BrandSelector({
                             }}
                             onFocus={() => setIsOpen(true)}
                             disabled={disabled || loading}
-                            style={{
-                                width: '100%',
-                                padding: '10px 12px 10px 36px',
-                                borderRadius: '8px',
-                                border: '1.5px solid var(--border-color)',
-                                backgroundColor: disabled ? 'var(--bg-secondary)' : 'var(--bg-primary)',
-                                fontSize: 'var(--font-size-sm)',
-                                color: 'var(--text-primary)',
-                                cursor: disabled ? 'not-allowed' : 'text'
-                            }}
+                            className="pl-9"
                         />
                     </div>
 
                     {/* Dropdown */}
                     {isOpen && companyId && (
                         <>
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: 0,
-                                    right: 0,
-                                    marginTop: '4px',
-                                    backgroundColor: 'var(--bg-primary)',
-                                    border: '1.5px solid var(--border-color)',
-                                    borderRadius: '8px',
-                                    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                    zIndex: 1000,
-                                    maxHeight: '300px',
-                                    overflowY: 'auto'
-                                }}
-                            >
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg z-50 max-h-72 overflow-y-auto">
                                 {loading ? (
-                                    <div style={{ padding: 'var(--space-m)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                    <div className="p-4 text-center text-muted-foreground">
                                         Loading brands...
                                     </div>
                                 ) : filteredBrands.length === 0 ? (
-                                    <div style={{ padding: 'var(--space-m)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                                    <div className="p-4 text-center text-muted-foreground">
                                         {searchQuery ? 'No brands found' : 'No brands available'}
                                     </div>
                                 ) : (
@@ -236,38 +159,23 @@ export default function BrandSelector({
                                             <div
                                                 key={brandId}
                                                 onClick={() => handleToggleBrand(brand)}
-                                                style={{
-                                                    padding: '10px 16px',
-                                                    cursor: 'pointer',
-                                                    backgroundColor: isSelected ? 'var(--accent-primary)15' : 'transparent',
-                                                    borderLeft: isSelected ? '3px solid var(--accent-primary)' : '3px solid transparent',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 'var(--space-s)',
-                                                    transition: 'background-color 0.2s'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    if (!isSelected) {
-                                                        e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                                                    }
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    if (!isSelected) {
-                                                        e.currentTarget.style.backgroundColor = 'transparent';
-                                                    }
-                                                }}
+                                                className={cn(
+                                                    "px-4 py-2.5 cursor-pointer flex items-center gap-3 transition-colors border-l-2",
+                                                    isSelected
+                                                        ? "bg-primary/10 border-l-primary"
+                                                        : "border-l-transparent hover:bg-muted"
+                                                )}
                                             >
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
                                                     onChange={() => handleToggleBrand(brand)}
-                                                    style={{ cursor: 'pointer' }}
+                                                    className="cursor-pointer"
                                                 />
-                                                <span style={{ 
-                                                    flex: 1,
-                                                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                                                    fontWeight: isSelected ? 600 : 400
-                                                }}>
+                                                <span className={cn(
+                                                    "flex-1",
+                                                    isSelected && "text-primary font-semibold"
+                                                )}>
                                                     {name}
                                                 </span>
                                             </div>
@@ -276,42 +184,23 @@ export default function BrandSelector({
                                 )}
                             </div>
                             <div
-                                style={{
-                                    position: 'fixed',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 999
-                                }}
+                                className="fixed inset-0 z-40"
                                 onClick={() => setIsOpen(false)}
                             />
                         </>
                     )}
 
                     {error && (
-                        <div style={{
-                            marginTop: 'var(--space-xs)',
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--accent-error)'
-                        }}>
-                            {error}
-                        </div>
+                        <p className="mt-1 text-xs text-destructive">{error}</p>
                     )}
 
                     {selectedBrands.length > 0 && (
-                        <div style={{
-                            marginTop: 'var(--space-xs)',
-                            fontSize: 'var(--font-size-xs)',
-                            color: 'var(--text-secondary)'
-                        }}>
+                        <p className="mt-1 text-xs text-muted-foreground">
                             {selectedBrands.length} brand{selectedBrands.length !== 1 ? 's' : ''} selected
-                        </div>
+                        </p>
                     )}
                 </>
             )}
         </div>
     );
 }
-
-

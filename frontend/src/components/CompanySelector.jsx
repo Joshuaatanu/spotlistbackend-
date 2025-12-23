@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Building2, Search } from 'lucide-react';
+import { Building2, Search, Check } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 export default function CompanySelector({ companyName, setCompanyName, setCompanyId }) {
     const [companies, setCompanies] = useState([]);
@@ -10,19 +13,15 @@ export default function CompanySelector({ companyName, setCompanyName, setCompan
     const [isOpen, setIsOpen] = useState(false);
     const [error, setError] = useState(null);
 
-    // Fetch companies from backend
     useEffect(() => {
         const fetchCompanies = async () => {
             setLoading(true);
             setError(null);
             try {
-                // Try to fetch from metadata endpoint first
                 const response = await axios.get(`${API_BASE_URL}/metadata/companies`);
                 if (response.data && Array.isArray(response.data)) {
                     setCompanies(response.data);
                 } else {
-                    // Fallback: try to get companies via AEOS helper
-                    // This would require a new backend endpoint
                     setCompanies([]);
                 }
             } catch (err) {
@@ -37,28 +36,26 @@ export default function CompanySelector({ companyName, setCompanyName, setCompan
         fetchCompanies();
     }, []);
 
-    // Filter companies based on search query
     const filteredCompanies = useMemo(() => {
         if (!searchQuery.trim()) {
-            return companies; // Show all companies if no search
+            return companies;
         }
         const query = searchQuery.toLowerCase();
         return companies.filter(company => {
             const name = company.caption || company.name || company.label || '';
             const value = company.value || company.id || '';
-            return name.toLowerCase().includes(query) || 
-                   String(value).includes(query);
-        }); // Show all matching results
+            return name.toLowerCase().includes(query) ||
+                String(value).includes(query);
+        });
     }, [companies, searchQuery]);
 
-    // Find selected company object
     const selectedCompany = useMemo(() => {
         if (!companyName) return null;
         return companies.find(c => {
             const name = c.caption || c.name || c.label || '';
             const value = c.value || c.id || '';
             return name.toLowerCase() === companyName.toLowerCase() ||
-                   String(value) === String(companyName);
+                String(value) === String(companyName);
         });
     }, [companies, companyName]);
 
@@ -81,115 +78,49 @@ export default function CompanySelector({ companyName, setCompanyName, setCompan
         }
     };
 
-    const displayName = selectedCompany 
+    const displayName = selectedCompany
         ? (selectedCompany.caption || selectedCompany.name || selectedCompany.label)
         : companyName;
 
     return (
-        <div style={{ position: 'relative' }}>
-            <label style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-s)',
-                marginBottom: 'var(--space-s)',
-                fontSize: 'var(--font-size-sm)',
-                fontWeight: 500,
-                color: 'var(--text-primary)'
-            }}>
-                <Building2 size={16} />
+        <div className="relative">
+            <Label className="flex items-center gap-2 mb-2">
+                <Building2 className="size-4" />
                 Company Name
-            </label>
-            
-            <div style={{ position: 'relative' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-xs)' }}>
-                    <input
+            </Label>
+
+            <div className="relative">
+                <div className="relative">
+                    <Input
                         type="text"
                         value={displayName}
                         onChange={handleInputChange}
                         onFocus={() => setIsOpen(true)}
                         placeholder="Search or type company name..."
-                        style={{
-                            width: '100%',
-                            padding: 'var(--space-m)',
-                            paddingRight: loading ? '40px' : 'var(--space-m)',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: '8px',
-                            fontSize: 'var(--font-size-base)',
-                            backgroundColor: 'var(--bg-secondary)',
-                            color: 'var(--text-primary)'
-                        }}
+                        className={cn(loading && "pr-10")}
                     />
                     {loading && (
-                        <div 
-                            className="loading-spinner"
-                            style={{ 
-                                position: 'absolute', 
-                                right: '12px',
-                                width: '16px',
-                                height: '16px'
-                            }} 
-                        />
+                        <div className="loading-spinner absolute right-3 top-1/2 -translate-y-1/2 size-4" />
                     )}
                 </div>
 
                 {error && (
-                    <p style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: 'var(--accent-error)',
-                        marginTop: 'var(--space-xs)',
-                        margin: 'var(--space-xs) 0 0 0'
-                    }}>
-                        {error}
-                    </p>
+                    <p className="text-xs text-destructive mt-1">{error}</p>
                 )}
 
                 {isOpen && (filteredCompanies.length > 0 || searchQuery) && (
-                    <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        left: 0,
-                        right: 0,
-                        marginTop: '4px',
-                        backgroundColor: 'var(--bg-primary)',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: '8px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                        zIndex: 1000,
-                        maxHeight: '500px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column'
-                    }}>
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-lg shadow-lg z-50 max-h-[500px] overflow-hidden flex flex-col">
                         {/* Search within dropdown */}
                         {companies.length > 10 && (
-                            <div style={{
-                                padding: 'var(--space-s)',
-                                borderBottom: '1px solid var(--border-color)',
-                                backgroundColor: 'var(--bg-secondary)'
-                            }}>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 'var(--space-xs)',
-                                    padding: 'var(--space-xs) var(--space-s)',
-                                    backgroundColor: 'var(--bg-primary)',
-                                    border: '1px solid var(--border-color)',
-                                    borderRadius: '6px'
-                                }}>
-                                    <Search size={14} style={{ color: 'var(--text-tertiary)' }} />
+                            <div className="p-2 border-b bg-muted">
+                                <div className="flex items-center gap-2 px-3 py-2 bg-background border rounded-md">
+                                    <Search className="size-4 text-muted-foreground" />
                                     <input
                                         type="text"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         placeholder="Search companies..."
-                                        style={{
-                                            flex: 1,
-                                            border: 'none',
-                                            outline: 'none',
-                                            backgroundColor: 'transparent',
-                                            color: 'var(--text-primary)',
-                                            fontSize: 'var(--font-size-sm)'
-                                        }}
+                                        className="flex-1 border-none outline-none bg-transparent text-sm"
                                         autoFocus
                                     />
                                 </div>
@@ -197,72 +128,38 @@ export default function CompanySelector({ companyName, setCompanyName, setCompan
                         )}
 
                         {/* Company list */}
-                        <div style={{
-                            overflowY: 'auto',
-                            maxHeight: '400px'
-                        }}>
+                        <div className="overflow-y-auto max-h-96">
                             {filteredCompanies.length > 0 ? (
                                 filteredCompanies.map((company, index) => {
                                     const name = company.caption || company.name || company.label || 'Unknown';
-                                    const isSelected = selectedCompany && 
+                                    const isSelected = selectedCompany &&
                                         (selectedCompany.value || selectedCompany.id) === (company.value || company.id);
-                                    
+
                                     return (
                                         <button
                                             key={company.value || company.id || index}
                                             type="button"
                                             onClick={() => handleSelectCompany(company)}
-                                            style={{
-                                                width: '100%',
-                                                padding: 'var(--space-m)',
-                                                border: 'none',
-                                                borderBottom: '1px solid var(--border-subtle)',
-                                                backgroundColor: isSelected 
-                                                    ? 'rgba(59, 130, 246, 0.1)' 
-                                                    : 'transparent',
-                                                color: 'var(--text-primary)',
-                                                cursor: 'pointer',
-                                                textAlign: 'left',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'space-between',
-                                                transition: 'background-color 0.2s'
-                                            }}
-                                            onMouseEnter={(e) => {
-                                                if (!isSelected) {
-                                                    e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
-                                                }
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                if (!isSelected) {
-                                                    e.currentTarget.style.backgroundColor = 'transparent';
-                                                }
-                                            }}
+                                            className={cn(
+                                                "w-full p-3 border-b last:border-b-0 flex items-center justify-between text-left transition-colors",
+                                                isSelected ? "bg-primary/10" : "hover:bg-muted"
+                                            )}
                                         >
-                                            <span style={{ fontWeight: isSelected ? 600 : 400 }}>
+                                            <span className={cn(isSelected && "font-semibold")}>
                                                 {name}
                                             </span>
                                             {isSelected && (
-                                                <span style={{ 
-                                                    color: 'var(--accent-primary)',
-                                                    fontSize: '18px'
-                                                }}>✓</span>
+                                                <Check className="size-5 text-primary" />
                                             )}
                                         </button>
                                     );
                                 })
                             ) : (
-                                <div style={{
-                                    padding: 'var(--space-l)',
-                                    textAlign: 'center',
-                                    color: 'var(--text-tertiary)',
-                                    fontSize: 'var(--font-size-sm)'
-                                }}>
+                                <div className="p-6 text-center text-muted-foreground text-sm">
                                     {searchQuery ? 'No companies found' : 'No companies available'}
                                 </div>
                             )}
                         </div>
-
                     </div>
                 )}
             </div>
@@ -270,14 +167,7 @@ export default function CompanySelector({ companyName, setCompanyName, setCompan
             {/* Click outside to close */}
             {isOpen && (
                 <div
-                    style={{
-                        position: 'fixed',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 999
-                    }}
+                    className="fixed inset-0 z-40"
                     onClick={() => {
                         setIsOpen(false);
                         setSearchQuery('');
@@ -285,19 +175,11 @@ export default function CompanySelector({ companyName, setCompanyName, setCompan
                 />
             )}
 
-            <p style={{
-                fontSize: 'var(--font-size-xs)',
-                color: 'var(--text-tertiary)',
-                marginTop: 'var(--space-xs)',
-                margin: 'var(--space-xs) 0 0 0'
-            }}>
-                {companies.length > 0 
+            <p className="text-xs text-muted-foreground mt-1">
+                {companies.length > 0
                     ? `${companies.length} companies available. ${searchQuery ? `${filteredCompanies.length} match your search` : 'Type to filter'}`
                     : 'Enter the company name to search for in TV audit data'}
             </p>
         </div>
     );
 }
-
-
-

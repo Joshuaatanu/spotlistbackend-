@@ -1,5 +1,8 @@
 import { Upload, FileText, X } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 export default function FileUpload({ file, setFile }) {
     const [isDragging, setIsDragging] = useState(false);
@@ -37,76 +40,26 @@ export default function FileUpload({ file, setFile }) {
 
     if (file) {
         return (
-            <div style={{
-                padding: 'var(--space-l)',
-                border: '2px solid rgba(10, 132, 255, 0.25)',
-                backgroundColor: 'rgba(10, 132, 255, 0.08)',
-                borderRadius: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 'var(--space-m)',
-                backdropFilter: 'blur(10px)'
-            }}>
-                <div style={{
-                    padding: 'var(--space-m)',
-                    backgroundColor: 'rgba(10, 132, 255, 0.15)',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    border: '1px solid rgba(10, 132, 255, 0.2)'
-                }}>
-                    <FileText size={24} style={{ color: 'var(--accent-primary)' }} />
+            <div className="p-6 border-2 border-primary/25 bg-primary/5 rounded-2xl flex items-center gap-4">
+                <div className="p-4 bg-primary/15 rounded-xl flex items-center justify-center shrink-0 border border-primary/20">
+                    <FileText className="size-6 text-primary" />
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{
-                        fontWeight: 600,
-                        fontSize: 'var(--font-size-base)',
-                        color: 'var(--text-primary)',
-                        margin: 0,
-                        marginBottom: 'var(--space-xs)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
-                    }}>
+                <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-foreground truncate mb-1">
                         {file.name}
                     </p>
-                    <p style={{
-                        fontSize: 'var(--font-size-sm)',
-                        color: 'var(--text-secondary)',
-                        margin: 0
-                    }}>
+                    <p className="text-sm text-muted-foreground">
                         {formatFileSize(file.size)}
                     </p>
                 </div>
-                <button
+                <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => setFile(null)}
-                    style={{
-                        padding: 'var(--space-s)',
-                        background: 'transparent',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'var(--text-secondary)',
-                        transition: 'background-color var(--transition-fast), color var(--transition-fast)',
-                        flexShrink: 0
-                    }}
-                    onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
-                        e.currentTarget.style.color = 'var(--text-primary)';
-                    }}
-                    onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'transparent';
-                        e.currentTarget.style.color = 'var(--text-secondary)';
-                    }}
-                    aria-label="Remove file"
+                    className="shrink-0"
                 >
-                    <X size={20} />
-                </button>
+                    <X className="size-5" />
+                </Button>
             </div>
         );
     }
@@ -116,69 +69,35 @@ export default function FileUpload({ file, setFile }) {
             onDrop={onDrop}
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
-            style={{
-                border: `2px dashed ${isDragging ? 'var(--accent-primary)' : 'var(--border-color)'}`,
-                borderRadius: '16px',
-                padding: 'var(--space-xxl)',
-                textAlign: 'center',
-                cursor: 'pointer',
-                transition: 'all var(--transition-base)',
-                backgroundColor: isDragging ? 'rgba(10, 132, 255, 0.08)' : 'transparent',
-                backdropFilter: 'blur(10px)'
-            }}
+            className={cn(
+                "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all",
+                isDragging ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+            )}
         >
             <input
                 type="file"
                 id="file-upload"
-                style={{ display: 'none' }}
+                className="hidden"
                 accept=".csv,.xlsx,.xls"
                 onChange={handleFileSelect}
             />
             <label
                 htmlFor="file-upload"
-                style={{
-                    cursor: 'pointer',
-                    display: 'block',
-                    width: '100%',
-                    height: '100%'
-                }}
+                className="cursor-pointer block"
             >
-                <div style={{
-                    width: '64px',
-                    height: '64px',
-                    backgroundColor: 'var(--bg-tertiary)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto var(--space-m)',
-                    transition: 'transform var(--transition-base)',
-                    transform: isDragging ? 'scale(1.1)' : 'scale(1)'
-                }}>
-                    <Upload size={32} style={{ color: 'var(--accent-primary)' }} />
+                <div className={cn(
+                    "size-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 transition-transform",
+                    isDragging && "scale-110"
+                )}>
+                    <Upload className="size-8 text-primary" />
                 </div>
-                <h3 className="font-display" style={{
-                    fontSize: 'var(--font-size-lg)',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    margin: 0,
-                    marginBottom: 'var(--space-s)'
-                }}>
+                <h3 className="font-display text-lg font-semibold mb-2">
                     Drop your spotlist here
                 </h3>
-                <p style={{
-                    fontSize: 'var(--font-size-sm)',
-                    color: 'var(--text-secondary)',
-                    margin: 0,
-                    marginBottom: 'var(--space-xs)'
-                }}>
+                <p className="text-sm text-muted-foreground mb-1">
                     or click to browse
                 </p>
-                <p style={{
-                    fontSize: 'var(--font-size-xs)',
-                    color: 'var(--text-tertiary)',
-                    margin: 0
-                }}>
+                <p className="text-xs text-muted-foreground">
                     Accepted: .csv, .xlsx, .xls (max 10MB)
                 </p>
             </label>

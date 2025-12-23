@@ -1,75 +1,43 @@
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+
 export default function MetricsCard({ title, value, subValue, icon: Icon, trend, onClick, isCritical }) {
     return (
-        <div
-            className="card"
-            style={{
-                cursor: onClick ? 'pointer' : 'default',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: '16px',
-                padding: '24px'
-            }}
+        <Card
+            className={cn(
+                "flex flex-row items-center gap-4 p-6 h-full transition-all",
+                onClick && "cursor-pointer hover:shadow-md"
+            )}
             onClick={onClick}
         >
             {Icon && (
-                <div style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '50%',
-                    backgroundColor: isCritical ? '#FEE2E2' : '#FEF3C7', // Light red or Light yellow
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0
-                }}>
-                    <Icon size={24} style={{ color: isCritical ? '#EF4444' : '#F59E0B' }} />
+                <div className={cn(
+                    "size-12 rounded-full flex items-center justify-center shrink-0",
+                    isCritical ? "bg-red-100 dark:bg-red-950/50" : "bg-amber-100 dark:bg-amber-950/50"
+                )}>
+                    <Icon className={cn(
+                        "size-6",
+                        isCritical ? "text-red-500" : "text-amber-500"
+                    )} />
                 </div>
             )}
-            
-            <div style={{ flex: 1 }}>
-                <div style={{
-                    fontSize: 'var(--font-size-sm)',
-                    fontWeight: 'var(--font-weight-semibold)',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '6px',
-                    letterSpacing: '-0.01em'
-                }}>
+
+            <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-muted-foreground mb-1.5 tracking-tight">
                     {title}
                 </div>
-                <div style={{
-                    fontSize: 'var(--font-size-2xl)',
-                    fontWeight: 'var(--font-weight-bold)',
-                    color: 'var(--text-primary)',
-                    lineHeight: 'var(--line-height-tight)',
-                    letterSpacing: '-0.02em',
-                    fontVariantNumeric: 'tabular-nums'
-                }}>
+                <div className="text-2xl font-bold text-foreground leading-tight tracking-tight tabular-nums">
                     {value}
                 </div>
                 {subValue && (
-                    <div style={{
-                        fontSize: 'var(--font-size-xs)',
-                        color: isCritical ? 'var(--accent-error)' : 'var(--text-tertiary)',
-                        marginTop: '6px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
-                    }}>
-                        <span style={{ 
-                            backgroundColor: isCritical ? '#FEF2F2' : '#ECFDF5',
-                            color: isCritical ? '#DC2626' : '#059669',
-                            padding: '3px 8px',
-                            borderRadius: '6px',
-                            fontWeight: 'var(--font-weight-semibold)',
-                            letterSpacing: '-0.01em'
-                        }}>
+                    <div className="mt-1.5">
+                        <Badge variant={isCritical ? "error" : "success"} className="text-xs">
                             {subValue}
-                    </span>
+                        </Badge>
                     </div>
                 )}
             </div>
-        </div>
+        </Card>
     );
 }
