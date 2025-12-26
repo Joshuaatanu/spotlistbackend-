@@ -50,6 +50,17 @@ except ImportError as e:
     traceback.print_exc()
     AEOS_AVAILABLE = False
 
+# Import Supabase client for database operations
+try:
+    from supabase_client import (
+        save_analysis, get_analyses, get_analysis_by_id, delete_analysis,
+        save_configuration, get_configuration, check_database_connection
+    )
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    print("Warning: Supabase client not available. Database features disabled.")
+    SUPABASE_AVAILABLE = False
+
 app = FastAPI(title="Spotlist Checker API")
 
 # Configure CORS
@@ -71,8 +82,18 @@ def dataframe_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
     """
 
     def _convert(value: Any) -> Any:
-        if pd.isna(value):
-            return None
+        # Handle arrays/lists first - pd.isna can't handle them
+        if isinstance(value, (list, np.ndarray)):
+            return [_convert(v) for v in value]
+        
+        # Check for scalar NA values
+        try:
+            if pd.isna(value):
+                return None
+        except (ValueError, TypeError):
+            # pd.isna fails on arrays with multiple elements
+            pass
+        
         if isinstance(value, (pd.Timestamp, datetime, date, time)):
             return value.isoformat()
         if hasattr(value, "item") and not isinstance(value, (str, bytes)):
@@ -293,6 +314,109 @@ def json_safe(value: Any) -> Any:
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+# ============================================================================
+# Database Endpoints (Supabase)
+# ============================================================================
+
+class AnalysisSaveRequest(BaseModel):
+    session_id: str
+    file_name: str
+    metrics: dict
+    spotlist_data: Optional[List[dict]] = None
+    metadata: Optional[dict] = None
+
+
+class ConfigurationSaveRequest(BaseModel):
+    session_id: str
+    config: dict
+
+
+@app.get("/db/health")
+async def database_health():
+    """Check database connection status."""
+    if not SUPABASE_AVAILABLE:
+        return {"connected": False, "error": "Supabase client not installed"}
+    return check_database_connection()
+
+
+@app.post("/analyses")
+async def create_analysis(request: AnalysisSaveRequest):
+    """Save an analysis result to the database."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    result = save_analysis(
+        session_id=request.session_id,
+        file_name=request.file_name,
+        metrics=request.metrics,
+        spotlist_data=request.spotlist_data,
+        metadata=request.metadata
+    )
+    
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to save analysis")
+    
+    return result
+
+
+@app.get("/analyses")
+async def list_analyses(session_id: str, limit: int = 10, offset: int = 0):
+    """Get analysis history for a session."""
+    if not SUPABASE_AVAILABLE:
+        return []
+    
+    return get_analyses(session_id, limit, offset)
+
+
+@app.get("/analyses/{analysis_id}")
+async def get_analysis(analysis_id: str):
+    """Get a specific analysis by ID."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    result = get_analysis_by_id(analysis_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    
+    return result
+
+
+@app.delete("/analyses/{analysis_id}")
+async def remove_analysis(analysis_id: str, session_id: str):
+    """Delete an analysis (only if it belongs to the session)."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    success = delete_analysis(analysis_id, session_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Analysis not found or unauthorized")
+    
+    return {"deleted": True}
+
+
+@app.post("/configurations")
+async def create_or_update_configuration(request: ConfigurationSaveRequest):
+    """Save or update user configuration."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+    
+    result = save_configuration(request.session_id, request.config)
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to save configuration")
+    
+    return result
+
+
+@app.get("/configurations/{session_id}")
+async def get_saved_configuration(session_id: str):
+    """Get saved configuration for a session."""
+    if not SUPABASE_AVAILABLE:
+        return None
+    
+    config = get_configuration(session_id)
+    return {"config": config}
 
 
 # Metadata endpoints for enhanced filtering

@@ -221,26 +221,36 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                     <thead>
                         <tr className="border-b-2 border-border">
                             <th className="w-10 px-4 py-3"></th>
-                            <th
-                                className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none hover:bg-muted"
-                                onClick={() => handleSort('program_original')}
-                            >
-                                Channel {sortColumn === 'program_original' && (sortDirection === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th
-                                className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none hover:bg-muted"
-                                onClick={() => handleSort('timestamp')}
-                            >
-                                Date {sortColumn === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold">Time</th>
-                            <th
-                                className="px-4 py-3 text-right text-sm font-semibold cursor-pointer select-none hover:bg-muted"
-                                onClick={() => handleSort('cost_numeric')}
-                            >
-                                Spend {sortColumn === 'cost_numeric' && (sortDirection === 'asc' ? '↑' : '↓')}
-                            </th>
-                            <th className="px-4 py-3 text-left text-sm font-semibold">Creative</th>
+                            {visibleColumns.channel && (
+                                <th
+                                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none hover:bg-muted"
+                                    onClick={() => handleSort('program_original')}
+                                >
+                                    Channel {sortColumn === 'program_original' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                            )}
+                            {visibleColumns.date && (
+                                <th
+                                    className="px-4 py-3 text-left text-sm font-semibold cursor-pointer select-none hover:bg-muted"
+                                    onClick={() => handleSort('timestamp')}
+                                >
+                                    Date {sortColumn === 'timestamp' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                            )}
+                            {visibleColumns.time && (
+                                <th className="px-4 py-3 text-left text-sm font-semibold">Time</th>
+                            )}
+                            {visibleColumns.spend && (
+                                <th
+                                    className="px-4 py-3 text-right text-sm font-semibold cursor-pointer select-none hover:bg-muted"
+                                    onClick={() => handleSort('cost_numeric')}
+                                >
+                                    Spend {sortColumn === 'cost_numeric' && (sortDirection === 'asc' ? '↑' : '↓')}
+                                </th>
+                            )}
+                            {visibleColumns.creative && (
+                                <th className="px-4 py-3 text-left text-sm font-semibold">Creative</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody>
@@ -274,17 +284,27 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                                                 <ChevronDown className="size-4 text-muted-foreground" />
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 font-semibold">{getChannel(item)}</td>
-                                        <td className="px-4 py-3">{formatDate(item.timestamp)}</td>
-                                        <td className="px-4 py-3">{formatTime(item.timestamp)}</td>
-                                        <td className="px-4 py-3 text-right tabular-nums">
-                                            €{getCost(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="px-4 py-3 max-w-[200px] truncate">{getCreative(item)}</td>
+                                        {visibleColumns.channel && (
+                                            <td className="px-4 py-3 font-semibold">{getChannel(item)}</td>
+                                        )}
+                                        {visibleColumns.date && (
+                                            <td className="px-4 py-3">{formatDate(item.timestamp)}</td>
+                                        )}
+                                        {visibleColumns.time && (
+                                            <td className="px-4 py-3">{formatTime(item.timestamp)}</td>
+                                        )}
+                                        {visibleColumns.spend && (
+                                            <td className="px-4 py-3 text-right tabular-nums">
+                                                €{getCost(item).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        )}
+                                        {visibleColumns.creative && (
+                                            <td className="px-4 py-3 max-w-[200px] truncate">{getCreative(item)}</td>
+                                        )}
                                     </tr>
                                     {isExpanded && (
                                         <tr key={`${index}-details`}>
-                                            <td colSpan={6} className="p-4 bg-muted/50 border-t">
+                                            <td colSpan={1 + Object.values(visibleColumns).filter(Boolean).length} className="p-4 bg-muted/50 border-t">
                                                 <div className="flex flex-col gap-4">
                                                     <div>
                                                         <strong className="text-sm">Spot Details:</strong>

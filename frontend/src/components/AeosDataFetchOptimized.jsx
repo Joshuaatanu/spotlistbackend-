@@ -49,15 +49,16 @@ const REPORT_CONFIGS = {
     },
     reachFrequency: {
         name: 'Reach & Frequency',
-        requiredParams: ['companyName', 'dateFrom', 'dateTo', 'channelFilter'],
+        requiredParams: ['dateFrom', 'dateTo', 'channelFilter'],
         optionalParams: ['profiles', 'dayparts'],
-        description: 'Audience reach and frequency distribution analysis',
+        description: 'Channel reach and audience share analysis (per-channel metrics)',
         tips: [
-            'Company name is required for reach analysis',
+            'Analyzes channel performance, not advertiser-specific data',
             'At least one channel must be specified',
-            'Profile selection targets specific demographics'
+            'Returns: reach %, share, AMR%, ATS',
+            'Profile/daypart filters available for demographic targeting'
         ],
-        showCompanySelector: true,
+        showCompanySelector: false,  // Channel Event Report doesn't filter by company
         showChannelFilter: true,
         channelFilterRequired: true,
         showAdvancedFilters: true,

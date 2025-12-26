@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3 } from 'lucide-react';
+import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye } from 'lucide-react';
 import ExcelJS from 'exceljs';
 import MetricsCard from './MetricsCard';
 import { DoubleSpendChart, DoubleCountChart } from './Charts';
@@ -11,16 +11,27 @@ import AIInsights from './AIInsights';
 import TopTenReportView from './TopTenReportView';
 import ReachFrequencyReportView from './ReachFrequencyReportView';
 import DeepAnalysisReportView from './DeepAnalysisReportView';
+import DaypartAnalysisReportView from './DaypartAnalysisReportView';
 import DashboardOverview from './DashboardOverview';
 import { enrichDataArray, initializeMetadata } from '../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { KeyboardShortcutsHelp, KeyboardShortcutsButton } from './KeyboardShortcutsHelp';
 import { FullscreenChart } from './FullscreenChart';
+import { useToast } from '@/hooks/useToast';
+
+// Available view modes for switching
+const VIEW_MODES = [
+    { id: 'spotlist', label: 'Spotlist', icon: Layers, description: 'Double booking analysis' },
+    { id: 'daypartAnalysis', label: 'Daypart', icon: Clock, description: 'Performance by time' },
+    { id: 'topTen', label: 'Top Ten', icon: Trophy, description: 'Rankings analysis' },
+    { id: 'deepAnalysis', label: 'KPIs', icon: Activity, description: 'Channel performance' },
+];
 
 export default function Dashboard({ data }) {
     const { metrics, window_summaries, data: rawData, field_map: fieldMap, metadata } = data || {};
@@ -30,6 +41,8 @@ export default function Dashboard({ data }) {
     const [enrichmentLoading, setEnrichmentLoading] = useState(false);
     const [showShortcuts, setShowShortcuts] = useState(false);
     const [filtersExpanded, setFiltersExpanded] = useState(false);
+    const [activeView, setActiveView] = useState(null); // null = auto-detect, or manual override
+    const { toast } = useToast();
 
     // Keyboard shortcuts
     useKeyboardShortcuts({
@@ -71,7 +84,8 @@ export default function Dashboard({ data }) {
 
     const displayData = enrichedData || rawData;
 
-    const reportType = useMemo(() => {
+    // Auto-detected report type based on data structure
+    const detectedReportType = useMemo(() => {
         if (metadata?.report_type) return metadata.report_type;
         if (!displayData || !Array.isArray(displayData) || displayData.length === 0) return 'spotlist';
 
@@ -88,6 +102,18 @@ export default function Dashboard({ data }) {
         return 'spotlist';
     }, [metadata, displayData]);
 
+    // Use activeView if manually set, otherwise use detected type
+    const reportType = activeView || detectedReportType;
+
+    // Check if view switching is supported (only for spotlist data with is_double field)
+    const canSwitchViews = useMemo(() => {
+        if (!displayData || !Array.isArray(displayData) || displayData.length === 0) return false;
+        // If it's spotlist data, we can switch to other analysis views
+        const firstItem = displayData[0];
+        const keys = Object.keys(firstItem);
+        return keys.some(k => k.toLowerCase().includes('is_double') || k.toLowerCase().includes('daypart'));
+    }, [displayData]);
+
     const displayMetrics = useMemo(() => {
         if (window_summaries && window_summaries.length > 0) {
             const window120 = window_summaries.find(w => w.window_minutes === 120);
@@ -97,6 +123,7 @@ export default function Dashboard({ data }) {
     }, [window_summaries, metrics]);
 
     const allTable = useMemo(() => {
+        if (!window_summaries || !Array.isArray(window_summaries)) return [];
         return window_summaries.map(w => {
             const m = w.all;
             if (!m) return null;
@@ -182,126 +209,187 @@ export default function Dashboard({ data }) {
         setFilteredData(filtered);
     }, [displayData, fieldMap]);
 
-    const dataToUse = filteredData || displayData;
+    const dataToUse = filteredData || displayData || [];
     const doubleBookings = useMemo(() => {
+        if (!dataToUse || !Array.isArray(dataToUse)) return [];
         return dataToUse.filter(r => r.is_double);
     }, [dataToUse]);
 
     const downloadFilteredCSV = async () => {
         const dataToExport = filteredData || displayData;
-        if (!dataToExport?.length) return;
+        if (!dataToExport?.length) {
+            toast({
+                title: 'No data to export',
+                description: 'There is no data available to export.',
+                variant: 'destructive',
+            });
+            return;
+        }
 
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet('Spotlist Data');
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Spotlist Data');
 
-        const headers = Object.keys(dataToExport[0]);
-        const headerRow = worksheet.addRow(headers);
-        headerRow.font = { bold: true, size: 11 };
-        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
-        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-        headerRow.height = 20;
+            const headers = Object.keys(dataToExport[0]);
+            const headerRow = worksheet.addRow(headers);
+            headerRow.font = { bold: true, size: 11 };
+            headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } };
+            headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+            headerRow.height = 20;
 
-        headerRow.eachCell((cell) => {
-            cell.border = {
-                top: { style: 'thin' },
-                left: { style: 'thin' },
-                bottom: { style: 'thin' },
-                right: { style: 'thin' }
-            };
-        });
-
-        dataToExport.forEach((row) => {
-            const rowData = headers.map(header => row[header] ?? '');
-            const excelRow = worksheet.addRow(rowData);
-            const isDouble = row.is_double === true || row.is_double === 'true' || row.is_double === 1;
-
-            if (isDouble) {
-                excelRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE5E5' } };
-                excelRow.font = { color: { argb: 'FF991B1B' } };
-            }
-
-            excelRow.eachCell((cell) => {
+            headerRow.eachCell((cell) => {
                 cell.border = {
-                    top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-                    left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-                    bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
-                    right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
                 };
-                cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
             });
-        });
 
-        worksheet.columns.forEach((column) => {
-            let maxLength = 10;
-            column.eachCell({ includeEmpty: false }, (cell) => {
-                const cellValue = cell.value ? cell.value.toString() : '';
-                if (cellValue.length > maxLength) maxLength = cellValue.length;
+            dataToExport.forEach((row) => {
+                const rowData = headers.map(header => row[header] ?? '');
+                const excelRow = worksheet.addRow(rowData);
+                const isDouble = row.is_double === true || row.is_double === 'true' || row.is_double === 1;
+
+                if (isDouble) {
+                    excelRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFE5E5' } };
+                    excelRow.font = { color: { argb: 'FF991B1B' } };
+                }
+
+                excelRow.eachCell((cell) => {
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                        left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                        bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+                        right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+                    };
+                    cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                });
             });
-            column.width = Math.min(maxLength + 2, 50);
-        });
 
-        worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+            worksheet.columns.forEach((column) => {
+                let maxLength = 10;
+                column.eachCell({ includeEmpty: false }, (cell) => {
+                    const cellValue = cell.value ? cell.value.toString() : '';
+                    if (cellValue.length > maxLength) maxLength = cellValue.length;
+                });
+                column.width = Math.min(maxLength + 2, 50);
+            });
 
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            worksheet.views = [{ state: 'frozen', ySplit: 1 }];
 
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        const filterSuffix = filters ? '_filtered' : '';
-        link.setAttribute('download', `spotlist_annotated${filterSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            const filterSuffix = filters ? '_filtered' : '';
+            link.setAttribute('download', `spotlist_annotated${filterSuffix}_${new Date().toISOString().split('T')[0]}.xlsx`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast({
+                title: 'Export successful',
+                description: `Exported ${dataToExport.length} rows to Excel.`,
+                variant: 'success',
+            });
+        } catch (error) {
+            console.error('Export failed:', error);
+            toast({
+                title: 'Export failed',
+                description: 'An error occurred while exporting the data.',
+                variant: 'destructive',
+            });
+        }
     };
 
     const hasXRP = displayMetrics?.total_xrp !== undefined;
     const hasReach = displayMetrics?.total_reach !== undefined;
 
+    // View Switcher Component
+    const ViewSwitcher = () => {
+        if (!canSwitchViews) return null;
+
+        return (
+            <Card className="mb-6">
+                <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Eye className="size-4 text-muted-foreground" />
+                            <CardTitle className="text-sm font-medium">View Mode</CardTitle>
+                        </div>
+                        {activeView && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setActiveView(null)}
+                                className="h-7 text-xs"
+                            >
+                                Reset to auto
+                            </Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="flex flex-wrap gap-2">
+                        {VIEW_MODES.map(mode => {
+                            const Icon = mode.icon;
+                            const isActive = reportType === mode.id;
+                            return (
+                                <Button
+                                    key={mode.id}
+                                    variant={isActive ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setActiveView(mode.id)}
+                                    className={cn(
+                                        "h-9 px-3",
+                                        isActive && "bg-primary text-primary-foreground"
+                                    )}
+                                >
+                                    <Icon className="size-4 mr-1.5" />
+                                    {mode.label}
+                                </Button>
+                            );
+                        })}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                        {activeView ? 'Manually selected view' : `Auto-detected: ${detectedReportType}`}
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    };
+
     if (enrichmentLoading && !displayData) {
         return <DashboardSkeleton />;
     }
 
-    if (reportType === 'topTen') {
-        return (
-            <div className="flex flex-col gap-8">
-                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
-                <TopTenReportView data={displayData} reportType={reportType} />
-            </div>
-        );
-    }
+    // Render appropriate view based on reportType
+    const renderReportView = () => {
+        switch (reportType) {
+            case 'topTen':
+                return <TopTenReportView data={displayData} reportType={reportType} />;
+            case 'reachFrequency':
+                return <ReachFrequencyReportView data={displayData || data} reportType={reportType} />;
+            case 'deepAnalysis':
+                return <DeepAnalysisReportView data={displayData} reportType={reportType} />;
+            case 'daypartAnalysis':
+                return <DaypartAnalysisReportView data={displayData} fieldMap={fieldMap} />;
+            default:
+                return null; // Spotlist view is handled separately below
+        }
+    };
 
-    if (reportType === 'reachFrequency') {
+    // For non-spotlist views, render with view switcher
+    if (reportType !== 'spotlist') {
         return (
             <div className="flex flex-col gap-8">
                 <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
-                <ReachFrequencyReportView data={displayData || data} reportType={reportType} />
-            </div>
-        );
-    }
-
-    if (reportType === 'deepAnalysis') {
-        return (
-            <div className="flex flex-col gap-8">
-                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
-                <DeepAnalysisReportView data={displayData} reportType={reportType} />
-            </div>
-        );
-    }
-
-    if (reportType === 'daypartAnalysis') {
-        return (
-            <div className="flex flex-col gap-8">
-                <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Daypart Analysis Report</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-muted-foreground">Performance analysis by time of day segments</p>
-                    </CardContent>
-                </Card>
+                <ViewSwitcher />
+                {renderReportView()}
             </div>
         );
     }
@@ -314,6 +402,9 @@ export default function Dashboard({ data }) {
 
             {/* Dashboard Overview */}
             <DashboardOverview data={data} reportType={reportType} metadata={metadata} />
+
+            {/* View Switcher */}
+            <ViewSwitcher />
 
             {/* AI Insights */}
             <AIInsights metrics={metrics} />
@@ -433,18 +524,20 @@ export default function Dashboard({ data }) {
             )}
 
             {/* Trend Activity Chart */}
-            <Card>
-                <CardHeader className="flex-row items-center justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                        Trend Activity
-                        {filteredData && <Badge variant="secondary" className="text-xs">Filtered</Badge>}
-                    </CardTitle>
-                    <span className="text-xs text-muted-foreground font-semibold">Last 30 Days</span>
-                </CardHeader>
-                <CardContent>
-                    <DoubleCountChart data={doubleBookings} programField={fieldMap?.program_column} />
-                </CardContent>
-            </Card>
+            <FullscreenChart title="Trend Activity">
+                <Card>
+                    <CardHeader className="flex-row items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            Trend Activity
+                            {filteredData && <Badge variant="secondary" className="text-xs">Filtered</Badge>}
+                        </CardTitle>
+                        <span className="text-xs text-muted-foreground font-semibold">Last 30 Days</span>
+                    </CardHeader>
+                    <CardContent>
+                        <DoubleCountChart data={doubleBookings} programField={fieldMap?.program_column} />
+                    </CardContent>
+                </Card>
+            </FullscreenChart>
 
             {/* Advanced Filters */}
             <AdvancedFilters

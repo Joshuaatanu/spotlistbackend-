@@ -33,6 +33,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             {/* Logo */}
             <div className="font-display text-xl font-extrabold mb-12 pl-3 text-sidebar-foreground tracking-tight">
                 Spot Analysis
+                <div className="text-xs font-normal text-muted-foreground mt-1">
+                    Detect conflicts & optimize reach
+                </div>
             </div>
 
             {/* Navigation */}

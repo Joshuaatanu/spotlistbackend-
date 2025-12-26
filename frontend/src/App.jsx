@@ -8,6 +8,9 @@ import ConfigPanel from './components/ConfigPanel';
 import Dashboard from './components/Dashboard';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import AnalysisWizard from './components/AnalysisWizard';
+import DashboardHome from './components/DashboardHome';
+import OnboardingTour from './components/OnboardingTour';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -16,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
+import { useAnalysisHistory } from './hooks/useAnalysisHistory';
 
 function App() {
   const [activeTab, setActiveTab] = useState('analyze');
@@ -52,9 +56,10 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
-  const [history, setHistory] = useState([]);
+  const { history, saveAnalysis, deleteAnalysis, dbAvailable } = useAnalysisHistory();
   const [progress, setProgress] = useState({ percentage: 0, message: '', stage: 'info' });
   const [collectedData, setCollectedData] = useState(null); // Store raw collected data
+  const [showWizard, setShowWizard] = useState(false); // Toggle between dashboard and wizard
 
   const handleAnalyze = async () => {
     if (!file) return;
@@ -81,7 +86,7 @@ function App() {
         id: Date.now()
       };
       setResults(analysisResult);
-      setHistory(prev => [analysisResult, ...prev].slice(0, 10)); // Keep last 10
+      saveAnalysis(analysisResult); // Save to database
       setActiveTab('results');
     } catch (err) {
       console.error(err);
@@ -93,7 +98,8 @@ function App() {
 
   const handleAnalyzeAeos = async () => {
     // Company name is required only for certain report types
-    const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+    // Note: topTen and reachFrequency do NOT require company name
+    const requiresCompany = ['spotlist', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
     if ((requiresCompany && !companyName) || !dateFrom || !dateTo) return;
 
     setLoading(true);
@@ -190,7 +196,7 @@ function App() {
                 };
                 setResults(analysisResult);
                 setCollectedData(null); // Clear collected data after analysis
-                setHistory(prev => [analysisResult, ...prev].slice(0, 10));
+                saveAnalysis(analysisResult); // Save to database
                 setActiveTab('results');
                 setLoading(false);
                 return;
@@ -221,9 +227,33 @@ function App() {
 
     setLoading(true);
     setError(null);
-    setProgress({ percentage: 0, message: 'Analyzing collected data...', stage: 'info' });
+    setProgress({ percentage: 0, message: 'Processing collected data...', stage: 'info' });
 
-    // Convert raw data to a file-like object for the analyze endpoint
+    // Check if this is a non-spotlist report type that doesn't need backend analysis
+    const reportType = collectedData.metadata?.report_type;
+    const skipBackendAnalysis = ['topTen', 'reachFrequency', 'deepAnalysis'].includes(reportType);
+
+    if (skipBackendAnalysis) {
+      // For Top Ten, R&F, Deep Analysis - display the data directly without /analyze
+      const displayResult = {
+        data: collectedData.raw_data,
+        fileName: collectedData.fileName,
+        timestamp: new Date().toISOString(),
+        id: Date.now(),
+        metadata: collectedData.metadata || { report_type: reportType },
+        metrics: {
+          total_records: collectedData.raw_data?.length || 0
+        }
+      };
+      setResults(displayResult);
+      setCollectedData(null);
+      saveAnalysis(displayResult);
+      setActiveTab('results');
+      setLoading(false);
+      return;
+    }
+
+    // For spotlist data, send to /analyze for double booking detection
     const csvData = convertToCSV(collectedData.raw_data);
     const blob = new Blob([csvData], { type: 'text/csv' });
     const file = new File([blob], `${collectedData.fileName}.csv`, { type: 'text/csv' });
@@ -250,7 +280,7 @@ function App() {
       };
       setResults(analysisResult);
       setCollectedData(null);
-      setHistory(prev => [analysisResult, ...prev].slice(0, 10));
+      saveAnalysis(analysisResult); // Save to database
       setActiveTab('results');
     } catch (err) {
       console.error(err);
@@ -299,7 +329,26 @@ function App() {
   };
 
   const handleSelectHistory = (analysis) => {
-    setResults(analysis);
+    // Normalize data structure from database format to Dashboard expected format
+    // Database stores: spotlist_data, file_name, created_at, metadata.window_summaries
+    // Dashboard expects: data, fileName, timestamp, window_summaries at top level
+    const normalizedResults = {
+      ...analysis,
+      // Map database fields to expected fields
+      data: analysis.data || analysis.spotlist_data || [],
+      fileName: analysis.fileName || analysis.file_name,
+      timestamp: analysis.timestamp || analysis.created_at,
+      // Extract window_summaries and field_map from metadata if stored there
+      window_summaries: analysis.window_summaries || analysis.metadata?.window_summaries || [],
+      field_map: analysis.field_map || analysis.metadata?.field_map || null,
+      // Keep original metrics
+      metrics: analysis.metrics || {},
+      metadata: {
+        ...analysis.metadata,
+        report_type: analysis.metadata?.report_type || 'spotlist'
+      }
+    };
+    setResults(normalizedResults);
     setActiveTab('results');
   };
 
@@ -319,10 +368,11 @@ function App() {
             <div className="mb-8 flex justify-between items-center">
               <div>
                 <h2 className="font-display text-2xl font-bold">
-                  {activeTab === 'analyze' ? 'Overview' :
-                    activeTab === 'results' ? 'Analysis Results' :
-                      activeTab === 'history' ? 'Payment History' :
-                        activeTab === 'configuration' ? 'Settings' : activeTab}
+                  {activeTab === 'analyze'
+                    ? (history.length > 0 && !showWizard ? 'Dashboard' : 'New Analysis')
+                    : activeTab === 'results' ? 'Analysis Results'
+                      : activeTab === 'history' ? 'Analysis History'
+                        : activeTab === 'configuration' ? 'Settings' : activeTab}
                 </h2>
               </div>
               {(activeTab === 'analyze' || activeTab === 'results') && (
@@ -332,196 +382,56 @@ function App() {
 
             {/* Content */}
             {activeTab === 'analyze' && (
-              <div className="animate-in">
-                <div className="grid grid-cols-[2fr_minmax(320px,1fr)] gap-8">
-                  <div className="flex flex-col gap-8">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          {dataSource === 'file' ? (
-                            <Upload className="size-5" />
-                          ) : (
-                            <Database className="size-5" />
-                          )}
-                          {dataSource === 'file' ? 'Upload Spotlist' : 'Fetch from AEOS TV Audit'}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        {/* Data Source Selector */}
-                        <Tabs value={dataSource} onValueChange={(v) => { setDataSource(v); setError(null); }} className="mb-6">
-                          <TabsList>
-                            <TabsTrigger value="file">File Upload</TabsTrigger>
-                            <TabsTrigger value="aeos">AEOS TV Audit</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-
-                        {/* Conditional rendering based on data source */}
-                        {dataSource === 'file' ? (
-                          <FileUpload file={file} setFile={setFile} />
-                        ) : (
-                          <AeosDataFetch
-                            companyName={companyName}
-                            setCompanyName={setCompanyName}
-                            companyId={companyId}
-                            setCompanyId={setCompanyId}
-                            brandIds={brandIds}
-                            setBrandIds={setBrandIds}
-                            productIds={productIds}
-                            setProductIds={setProductIds}
-                            dateFrom={dateFrom}
-                            setDateFrom={setDateFrom}
-                            dateTo={dateTo}
-                            setDateTo={setDateTo}
-                            channelFilter={channelFilter}
-                            setChannelFilter={setChannelFilter}
-                            reportType={reportType}
-                            setReportType={setReportType}
-                            filters={filters}
-                            setFilters={setFilters}
-                            topTenSubtype={topTenSubtype}
-                            setTopTenSubtype={setTopTenSubtype}
-                          />
-                        )}
-
-                        {error && (
-                          <Alert variant="destructive" className="mt-4">
-                            <AlertDescription>{error}</AlertDescription>
-                          </Alert>
-                        )}
-
-                        {/* Collection Complete - Show Options */}
-                        {dataSource === 'aeos' && collectedData && !loading && (
-                          <div className="mt-6 p-6 bg-emerald-500/10 border-2 border-emerald-500/25 rounded-xl">
-                            <div className="flex items-center gap-3 mb-4">
-                              <div className="size-10 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
-                                <span className="text-2xl">✓</span>
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold mb-1">
-                                  Data Collection Complete!
-                                </h3>
-                                <p className="text-sm text-muted-foreground">
-                                  Found {collectedData.metadata.total_spots} spots from {collectedData.metadata.channels_found.length} channel(s)
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex gap-4">
-                              <Button
-                                variant="outline"
-                                onClick={handleDownloadRawData}
-                                className="flex-1"
-                              >
-                                <Download className="size-5" />
-                                Download Raw Data
-                              </Button>
-
-                              <Button
-                                onClick={handleAnalyzeCollectedData}
-                                className="flex-1"
-                              >
-                                <Activity className="size-5" />
-                                Analyze Data
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Progress Bar */}
-                        {dataSource === 'aeos' && loading && (
-                          <div className="mt-6 p-4 bg-muted rounded-lg border">
-                            <div className="flex justify-between items-center mb-2">
-                              <span className="text-sm font-medium">
-                                {progress.message || 'Processing...'}
-                              </span>
-                              <Badge variant={progress.stage === 'error' ? 'destructive' : progress.stage === 'success' ? 'success' : 'default'}>
-                                {progress.percentage}%
-                              </Badge>
-                            </div>
-                            <Progress
-                              value={progress.percentage}
-                              className={cn(
-                                progress.stage === 'error' && "[&>div]:bg-destructive",
-                                progress.stage === 'success' && "[&>div]:bg-emerald-500"
-                              )}
-                            />
-                          </div>
-                        )}
-
-                        {/* Primary action button - more prominent */}
-                        {dataSource === 'aeos' && (
-                          <div>
-                            {!loading && !collectedData && (
-                              <Alert variant="info" className="mt-4">
-                                <AlertDescription className="text-center">
-                                  ⏱️ Data collection may take several minutes depending on the number of channels and date range.
-                                </AlertDescription>
-                              </Alert>
-                            )}
-                            <Button
-                              onClick={handleAnalyzeAeos}
-                              disabled={(() => {
-                                // Company name is required only for certain report types
-                                const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
-                                return (requiresCompany && !companyName) || !dateFrom || !dateTo || loading;
-                              })()}
-                              className="w-full mt-4"
-                              size="lg"
-                            >
-                              {loading ? (
-                                <>
-                                  <div className="loading-spinner" />
-                                  Collecting Data from AEOS...
-                                </>
-                              ) : collectedData ? (
-                                '▶ Collect New Data'
-                              ) : (
-                                '▶ Start Data Collection'
-                              )}
-                            </Button>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <div className="flex flex-col gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                          <Settings className="size-5" />
-                          Configuration
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <ConfigPanel config={config} setConfig={setConfig} />
-
-                        <Button
-                          onClick={dataSource === 'file' ? handleAnalyze : handleAnalyzeAeos}
-                          disabled={
-                            (dataSource === 'file' && !file) ||
-                            (dataSource === 'aeos' && (() => {
-                              // Company name is required only for certain report types
-                              const requiresCompany = ['spotlist', 'reachFrequency', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
-                              return (requiresCompany && !companyName) || !dateFrom || !dateTo;
-                            })()) ||
-                            loading
-                          }
-                          className="w-full mt-6"
-                        >
-                          {loading ? (
-                            <>
-                              <div className="loading-spinner" />
-                              {dataSource === 'aeos' ? 'Fetching & Analyzing...' : 'Analyzing...'}
-                            </>
-                          ) : (
-                            'Run Analysis'
-                          )}
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </div>
+              <div>
+                {/* Show Dashboard if user has history and not in wizard mode */}
+                {history.length > 0 && !showWizard ? (
+                  <DashboardHome
+                    history={history}
+                    onStartNewAnalysis={() => setShowWizard(true)}
+                    onViewHistory={() => setActiveTab('history')}
+                    onSelectAnalysis={(analysis) => {
+                      handleSelectHistory(analysis);
+                    }}
+                  />
+                ) : (
+                  /* Show Wizard for new analysis */
+                  <AnalysisWizard
+                    dataSource={dataSource}
+                    setDataSource={setDataSource}
+                    file={file}
+                    setFile={setFile}
+                    companyName={companyName}
+                    setCompanyName={setCompanyName}
+                    companyId={companyId}
+                    setCompanyId={setCompanyId}
+                    brandIds={brandIds}
+                    setBrandIds={setBrandIds}
+                    productIds={productIds}
+                    setProductIds={setProductIds}
+                    dateFrom={dateFrom}
+                    setDateFrom={setDateFrom}
+                    dateTo={dateTo}
+                    setDateTo={setDateTo}
+                    channelFilter={channelFilter}
+                    setChannelFilter={setChannelFilter}
+                    reportType={reportType}
+                    setReportType={setReportType}
+                    filters={filters}
+                    setFilters={setFilters}
+                    topTenSubtype={topTenSubtype}
+                    setTopTenSubtype={setTopTenSubtype}
+                    config={config}
+                    setConfig={setConfig}
+                    onAnalyze={handleAnalyze}
+                    onAnalyzeAeos={handleAnalyzeAeos}
+                    loading={loading}
+                    error={error}
+                    progress={progress}
+                    collectedData={collectedData}
+                    onAnalyzeCollectedData={handleAnalyzeCollectedData}
+                    onDownloadRawData={handleDownloadRawData}
+                  />
+                )}
               </div>
             )}
 
@@ -554,11 +464,16 @@ function App() {
                           <div className="flex items-start justify-between mb-4">
                             <FileText className="size-5 text-primary" />
                             <span className="text-xs text-muted-foreground">
-                              {new Date(item.timestamp).toLocaleDateString()}
+                              {(() => {
+                                const dateStr = item.timestamp || item.created_at;
+                                if (!dateStr) return 'Unknown date';
+                                const date = new Date(dateStr);
+                                return isNaN(date.getTime()) ? 'Unknown date' : date.toLocaleDateString();
+                              })()}
                             </span>
                           </div>
                           <h3 className="font-semibold mb-2">
-                            {item.fileName}
+                            {item.fileName || item.file_name || 'Unnamed analysis'}
                           </h3>
                           {item.metrics && (
                             <div className="flex gap-4 mt-4">
@@ -605,6 +520,7 @@ function App() {
         </div>
       </div>
       <Toaster />
+      <OnboardingTour />
     </>
   );
 }

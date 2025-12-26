@@ -1,17 +1,37 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
-import { Activity, TrendingUp, Target, Users, BarChart3 } from 'lucide-react';
+import { useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Cell, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { Activity, TrendingUp, Target, Users, BarChart3, Download, Award, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import ExcelJS from 'exceljs';
+import { useToast } from '@/hooks/useToast';
 
 export default function DeepAnalysisReportView({ data, reportType }) {
+    const { toast } = useToast();
+
     if (!data || !Array.isArray(data) || data.length === 0) {
         return (
-            <div className="card" style={{ textAlign: 'center', padding: '60px' }}>
-                <Activity size={48} style={{ color: 'var(--text-tertiary)', margin: '0 auto 16px' }} />
-                <p className="text-secondary">No Deep Analysis data available.</p>
-            </div>
+            <Card className="text-center py-16">
+                <CardContent>
+                    <Activity className="size-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No Deep Analysis data available.</p>
+                </CardContent>
+            </Card>
         );
     }
 
-    // KPI fields that might be in the data
+    // KPI fields
     const kpiFields = [
         'amr-perc', 'amr_perc', 'amr',
         'reach (%)', 'reach_perc', 'reach',
@@ -19,249 +39,373 @@ export default function DeepAnalysisReportView({ data, reportType }) {
         'share',
         'ats-avg', 'ats_avg',
         'atv-avg', 'atv_avg',
-        'airings'
+        'airings', 'spend', 'cost'
     ];
 
-    // Find which KPIs are present in the data
-    const availableKPIs = kpiFields.filter(kpi => 
-        data.some(item => Object.keys(item).some(key => 
-            key.toLowerCase().includes(kpi.toLowerCase().replace(/[-\s]/g, ''))
-        ))
-    );
-
     // Get channel/entity identifier
-    const entityKey = Object.keys(data[0] || {}).find(k => 
+    const entityKey = Object.keys(data[0] || {}).find(k =>
         ['channel', 'event', 'name', 'label', 'caption'].includes(k.toLowerCase())
     ) || 'channel';
 
-    // Prepare data for charts
-    const chartData = data.map(item => {
-        const result = {
-            name: item[entityKey] || item.channel || item.event || 'Unknown',
-            ...item
-        };
-        
-        // Normalize KPI field names
-        kpiFields.forEach(kpi => {
-            const key = Object.keys(item).find(k => 
-                k.toLowerCase().includes(kpi.toLowerCase().replace(/[-\s]/g, ''))
-            );
-            if (key && key !== entityKey) {
-                result[kpi] = parseFloat(item[key] || 0);
-            }
-        });
-        
-        return result;
-    });
+    // Find available KPIs
+    const availableKPIs = useMemo(() => {
+        return kpiFields.filter(kpi =>
+            data.some(item => Object.keys(item).some(key =>
+                key.toLowerCase().includes(kpi.toLowerCase().replace(/[-\s]/g, ''))
+            ))
+        );
+    }, [data]);
 
-    // Prepare radar chart data (for first channel/entity)
-    const firstEntity = chartData[0];
-    const radarData = availableKPIs.slice(0, 6).map(kpi => {
-        const value = firstEntity[kpi] || 0;
-        const maxValue = Math.max(...chartData.map(d => d[kpi] || 0));
+    // === ANALYSIS CALCULATIONS ===
+    const analysis = useMemo(() => {
+        // Prepare data with normalized KPIs
+        const chartData = data.map(item => {
+            const result = {
+                name: item[entityKey] || item.channel || item.event || 'Unknown',
+                ...item
+            };
+
+            kpiFields.forEach(kpi => {
+                const key = Object.keys(item).find(k =>
+                    k.toLowerCase().includes(kpi.toLowerCase().replace(/[-\s]/g, ''))
+                );
+                if (key && key !== entityKey) {
+                    result[kpi] = parseFloat(item[key] || 0);
+                }
+            });
+
+            return result;
+        });
+
+        // Calculate averages for benchmarking
+        const averages = {};
+        availableKPIs.forEach(kpi => {
+            const values = chartData.map(d => d[kpi] || 0).filter(v => v > 0);
+            averages[kpi] = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+        });
+
+        // Calculate efficiency scores
+        const withScores = chartData.map(item => {
+            // Performance index = (actual / average) * 100 for each KPI
+            const scores = {};
+            let totalScore = 0;
+            let scoreCount = 0;
+
+            availableKPIs.forEach(kpi => {
+                if (item[kpi] > 0 && averages[kpi] > 0) {
+                    const score = (item[kpi] / averages[kpi]) * 100;
+                    scores[`${kpi}_score`] = score;
+                    totalScore += score;
+                    scoreCount++;
+                }
+            });
+
+            const overallScore = scoreCount > 0 ? totalScore / scoreCount : 0;
+
+            // Efficiency rating
+            let rating = 'Average';
+            let ratingColor = 'secondary';
+            if (overallScore >= 120) {
+                rating = 'Excellent';
+                ratingColor = 'default';
+            } else if (overallScore >= 100) {
+                rating = 'Good';
+                ratingColor = 'default';
+            } else if (overallScore < 80) {
+                rating = 'Below Average';
+                ratingColor = 'destructive';
+            }
+
+            return {
+                ...item,
+                ...scores,
+                overallScore,
+                rating,
+                ratingColor
+            };
+        });
+
+        // Sort by overall score
+        const sorted = [...withScores].sort((a, b) => b.overallScore - a.overallScore);
+
+        // Top performers (score > 110)
+        const topPerformers = sorted.filter(d => d.overallScore >= 110);
+        const underPerformers = sorted.filter(d => d.overallScore < 90);
+
+        // Radar data for top performer vs average
+        const radarData = availableKPIs.slice(0, 6).map(kpi => {
+            const topValue = sorted[0]?.[kpi] || 0;
+            const avgValue = averages[kpi] || 0;
+            const maxValue = Math.max(...chartData.map(d => d[kpi] || 0));
+
+            return {
+                kpi: kpi.replace(/[-_]/g, ' ').toUpperCase(),
+                topPerformer: maxValue > 0 ? (topValue / maxValue) * 100 : 0,
+                average: maxValue > 0 ? (avgValue / maxValue) * 100 : 0,
+                topActual: topValue,
+                avgActual: avgValue
+            };
+        });
+
+        // Insights
+        const insights = [];
+        if (topPerformers.length > 0) {
+            insights.push({
+                type: 'success',
+                title: 'Top Performers',
+                message: `${topPerformers.map(p => p.name).join(', ')} are performing above average`
+            });
+        }
+        if (underPerformers.length > 0) {
+            insights.push({
+                type: 'warning',
+                title: 'Needs Attention',
+                message: `${underPerformers.map(p => p.name).join(', ')} are below average performance`
+            });
+        }
+
         return {
-            kpi: kpi.replace(/[-_]/g, ' ').toUpperCase(),
-            value: maxValue > 0 ? (value / maxValue) * 100 : 0,
-            actual: value
+            chartData: sorted,
+            averages,
+            radarData,
+            topPerformers,
+            underPerformers,
+            insights,
+            leader: sorted[0]
         };
-    });
+    }, [data, availableKPIs, entityKey]);
+
+    const barColors = ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
+
+    const downloadExcel = async () => {
+        try {
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('Channel Analysis');
+
+            const headers = ['Rank', entityKey, 'Overall Score', 'Rating', ...availableKPIs.map(k => k.toUpperCase())];
+            const headerRow = worksheet.addRow(headers);
+            headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } };
+
+            analysis.chartData.forEach((item, i) => {
+                worksheet.addRow([
+                    i + 1,
+                    item.name,
+                    item.overallScore.toFixed(0),
+                    item.rating,
+                    ...availableKPIs.map(kpi => item[kpi]?.toFixed(2) ?? '-')
+                ]);
+            });
+
+            // Benchmarks sheet
+            const benchmarkSheet = workbook.addWorksheet('Benchmarks');
+            benchmarkSheet.addRow(['KPI', 'Average', 'Best', 'Best Channel']);
+            benchmarkSheet.getRow(1).font = { bold: true };
+            availableKPIs.forEach(kpi => {
+                const best = analysis.chartData.reduce((max, d) => (d[kpi] > (max[kpi] || 0) ? d : max), {});
+                benchmarkSheet.addRow([kpi.toUpperCase(), analysis.averages[kpi]?.toFixed(2), best[kpi]?.toFixed(2), best.name]);
+            });
+
+            workbook.eachSheet(sheet => { sheet.columns.forEach(col => { col.width = 15; }); });
+
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `deep_analysis_${new Date().toISOString().split('T')[0]}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            toast({ title: 'Export successful', variant: 'success' });
+        } catch (error) {
+            console.error('Export failed:', error);
+            toast({ title: 'Export failed', variant: 'destructive' });
+        }
+    };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div className="flex flex-col gap-8">
             {/* Header */}
-            <div className="card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-m)', marginBottom: 'var(--space-l)' }}>
-                    <div style={{
-                        width: '56px',
-                        height: '56px',
-                        borderRadius: '50%',
-                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                    }}>
-                        <Activity size={28} style={{ color: '#10B981' }} />
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="size-14 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                                <Activity className="size-7 text-emerald-500" />
+                            </div>
+                            <div>
+                                <CardTitle className="text-xl">Deep Analysis (KPIs)</CardTitle>
+                                <CardDescription>Channel efficiency scoring and performance benchmarking</CardDescription>
+                            </div>
+                        </div>
+                        <Button onClick={downloadExcel} variant="outline">
+                            <Download className="size-4" />
+                            Export Analysis
+                        </Button>
                     </div>
-                    <div>
-                        <h2 style={{ margin: 0, marginBottom: '4px' }}>Deep Analysis (KPIs)</h2>
-                        <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                            Channel/Event analysis with key performance indicators
-                        </p>
-                    </div>
-                </div>
+                </CardHeader>
+            </Card>
+
+            {/* Insights */}
+            {analysis.insights.map((insight, i) => (
+                <Alert key={i} variant={insight.type === 'warning' ? 'destructive' : 'default'}>
+                    {insight.type === 'warning' ? <AlertTriangle className="size-4" /> : <CheckCircle className="size-4" />}
+                    <AlertTitle>{insight.title}</AlertTitle>
+                    <AlertDescription>{insight.message}</AlertDescription>
+                </Alert>
+            ))}
+
+            {/* Summary Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Award className="size-4 text-amber-500" />
+                            <span className="text-sm font-medium text-muted-foreground">Top Performer</span>
+                        </div>
+                        <p className="text-xl font-bold truncate">{analysis.leader?.name}</p>
+                        <Badge className="mt-1">Score: {analysis.leader?.overallScore.toFixed(0)}</Badge>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <TrendingUp className="size-4 text-green-500" />
+                            <span className="text-sm font-medium text-muted-foreground">Above Average</span>
+                        </div>
+                        <p className="text-3xl font-bold">{analysis.topPerformers.length}</p>
+                        <p className="text-xs text-muted-foreground">channels scoring 110+</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <AlertTriangle className="size-4 text-red-500" />
+                            <span className="text-sm font-medium text-muted-foreground">Below Average</span>
+                        </div>
+                        <p className="text-3xl font-bold">{analysis.underPerformers.length}</p>
+                        <p className="text-xs text-muted-foreground">channels scoring &lt;90</p>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center gap-2 mb-2">
+                            <BarChart3 className="size-4 text-blue-500" />
+                            <span className="text-sm font-medium text-muted-foreground">Channels Analyzed</span>
+                        </div>
+                        <p className="text-3xl font-bold">{analysis.chartData.length}</p>
+                    </CardContent>
+                </Card>
             </div>
 
-            {/* KPI Summary Cards */}
-            {firstEntity && (
-                <div className="grid grid-cols-4" style={{ gap: '24px' }}>
-                    {firstEntity['amr-perc'] !== undefined && (
-                        <div className="card">
-                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                AMR %
-                            </div>
-                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {firstEntity['amr-perc'].toFixed(2)}%
-                            </div>
-                        </div>
-                    )}
-                    {firstEntity['reach (%)'] !== undefined && (
-                        <div className="card">
-                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                Reach %
-                            </div>
-                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {firstEntity['reach (%)'].toFixed(2)}%
-                            </div>
-                        </div>
-                    )}
-                    {firstEntity.share !== undefined && (
-                        <div className="card">
-                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                Share
-                            </div>
-                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {firstEntity.share.toFixed(2)}%
-                            </div>
-                        </div>
-                    )}
-                    {firstEntity.airings !== undefined && (
-                        <div className="card">
-                            <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                                Airings
-                            </div>
-                            <div style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, color: 'var(--text-primary)' }}>
-                                {firstEntity.airings.toLocaleString()}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Radar Chart for KPI Overview */}
-            {radarData.length > 0 && (
-                <div className="card">
-                    <h3 style={{ marginBottom: '24px' }}>KPI Overview - {firstEntity?.name}</h3>
-                    <ResponsiveContainer width="100%" height={400}>
-                        <RadarChart data={radarData}>
-                            <PolarGrid />
-                            <PolarAngleAxis dataKey="kpi" style={{ fontSize: '12px' }} />
-                            <PolarRadiusAxis angle={90} domain={[0, 100]} />
-                            <Radar 
-                                name="KPI Value" 
-                                dataKey="value" 
-                                stroke="#10B981" 
-                                fill="#10B981" 
-                                fillOpacity={0.6} 
-                            />
-                            <Tooltip
-                                contentStyle={{ 
-                                    backgroundColor: '#FFFFFF', 
-                                    borderColor: '#E5E7EB', 
-                                    color: '#1A1A1A', 
-                                    borderRadius: '8px', 
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
-                                }}
-                                formatter={(value, name, props) => [
-                                    `${props.payload.actual.toFixed(2)} (${value.toFixed(1)}% of max)`,
-                                    props.payload.kpi
-                                ]}
-                            />
-                        </RadarChart>
-                    </ResponsiveContainer>
-                </div>
-            )}
-
-            {/* Channel Comparison Chart */}
-            {chartData.length > 1 && (
-                <div className="card">
-                    <h3 style={{ marginBottom: '24px' }}>Channel Comparison</h3>
-                    <ResponsiveContainer width="100%" height={400}>
-                        <BarChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
-                            <XAxis 
-                                dataKey="name" 
-                                stroke="#9CA3AF" 
-                                fontSize={12} 
-                                tickLine={false} 
-                                axisLine={false}
-                                angle={-45}
-                                textAnchor="end"
-                                height={100}
-                            />
-                            <YAxis stroke="#9CA3AF" fontSize={12} tickLine={false} axisLine={false} />
-                            <Tooltip
-                                contentStyle={{ 
-                                    backgroundColor: '#FFFFFF', 
-                                    borderColor: '#E5E7EB', 
-                                    color: '#1A1A1A', 
-                                    borderRadius: '8px', 
-                                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' 
-                                }}
-                            />
-                            <Legend />
-                            {availableKPIs.slice(0, 4).map((kpi, index) => (
-                                <Bar 
-                                    key={kpi}
-                                    dataKey={kpi} 
-                                    fill={['#10B981', '#3B82F6', '#F59E0B', '#EF4444'][index % 4]}
-                                    radius={[4, 4, 0, 0]}
+            {/* Radar Chart - Top vs Average */}
+            {analysis.radarData.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Top Performer vs Market Average</CardTitle>
+                        <CardDescription>Comparing {analysis.leader?.name} against average performance</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ResponsiveContainer width="100%" height={350}>
+                            <RadarChart data={analysis.radarData}>
+                                <PolarGrid className="stroke-muted" />
+                                <PolarAngleAxis dataKey="kpi" className="text-xs" />
+                                <PolarRadiusAxis angle={90} domain={[0, 100]} />
+                                <Radar name="Top Performer" dataKey="topPerformer" stroke="#10B981" fill="#10B981" fillOpacity={0.5} />
+                                <Radar name="Average" dataKey="average" stroke="#6B7280" fill="#6B7280" fillOpacity={0.2} />
+                                <Legend />
+                                <Tooltip
+                                    contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                    formatter={(value, name, props) => [props.payload[name === 'Top Performer' ? 'topActual' : 'avgActual']?.toFixed(2), name]}
                                 />
-                            ))}
+                            </RadarChart>
+                        </ResponsiveContainer>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Performance Scores Chart */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Channel Performance Scores</CardTitle>
+                    <CardDescription>100 = market average. Higher is better.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ResponsiveContainer width="100%" height={400}>
+                        <BarChart data={analysis.chartData} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} className="stroke-muted" />
+                            <XAxis type="number" domain={[0, 'auto']} className="text-xs" tickLine={false} axisLine={false} />
+                            <YAxis dataKey="name" type="category" className="text-xs" tickLine={false} axisLine={false} width={120} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: 'hsl(var(--background))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+                                formatter={(value) => [`${value.toFixed(0)} (${value >= 100 ? 'Above' : 'Below'} avg)`, 'Score']}
+                            />
+                            <Bar dataKey="overallScore" radius={[0, 4, 4, 0]}>
+                                {analysis.chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.overallScore >= 110 ? '#10B981' : entry.overallScore >= 100 ? '#3B82F6' : entry.overallScore >= 90 ? '#F59E0B' : '#EF4444'} />
+                                ))}
+                            </Bar>
                         </BarChart>
                     </ResponsiveContainer>
-                </div>
-            )}
+                </CardContent>
+            </Card>
 
-            {/* Detailed KPI Table */}
-            <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-                <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <h3 style={{ margin: 0 }}>Detailed KPI Data</h3>
-                </div>
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                            <tr style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '2px solid var(--border-color)' }}>
-                                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                                    {entityKey.charAt(0).toUpperCase() + entityKey.slice(1)}
-                                </th>
-                                {availableKPIs.map(kpi => (
-                                    <th key={kpi} style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
-                                        {kpi.replace(/[-_]/g, ' ').toUpperCase()}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {chartData.map((item, index) => (
-                                <tr 
-                                    key={index}
-                                    style={{ 
-                                        borderBottom: '1px solid var(--border-subtle)',
-                                        backgroundColor: index % 2 === 0 ? 'transparent' : 'var(--bg-secondary)'
-                                    }}
-                                >
-                                    <td style={{ padding: '12px 16px', fontWeight: 500 }}>{item.name}</td>
-                                    {availableKPIs.map(kpi => (
-                                        <td key={kpi} style={{ padding: '12px 16px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                                            {item[kpi] !== undefined 
-                                                ? (kpi.includes('%') || kpi.includes('perc') || kpi === 'share'
-                                                    ? `${parseFloat(item[kpi] || 0).toFixed(2)}%`
-                                                    : parseFloat(item[kpi] || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
-                                                )
-                                                : '-'
-                                            }
-                                        </td>
+            {/* Detailed Table */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Performance Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                    <TableHead className="w-12">Rank</TableHead>
+                                    <TableHead>Channel</TableHead>
+                                    <TableHead className="text-right">Score</TableHead>
+                                    <TableHead className="text-center">Rating</TableHead>
+                                    {availableKPIs.slice(0, 4).map(kpi => (
+                                        <TableHead key={kpi} className="text-right">{kpi.replace(/[-_]/g, ' ').toUpperCase()}</TableHead>
                                     ))}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analysis.chartData.map((item, index) => (
+                                    <TableRow key={index} className={item.overallScore >= 110 ? 'bg-emerald-500/5' : item.overallScore < 90 ? 'bg-red-500/5' : ''}>
+                                        <TableCell className="font-bold">
+                                            {index === 0 && '🥇'}
+                                            {index === 1 && '🥈'}
+                                            {index === 2 && '🥉'}
+                                            {index >= 3 && `#${index + 1}`}
+                                        </TableCell>
+                                        <TableCell className="font-medium">{item.name}</TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Progress value={Math.min(item.overallScore, 150) / 1.5} className="w-16" />
+                                                <span className="tabular-nums w-10">{item.overallScore.toFixed(0)}</span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="text-center">
+                                            <Badge variant={item.ratingColor}>{item.rating}</Badge>
+                                        </TableCell>
+                                        {availableKPIs.slice(0, 4).map(kpi => (
+                                            <TableCell key={kpi} className="text-right tabular-nums">
+                                                {item[kpi]?.toFixed(2) ?? '-'}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 }
-
-
-
-

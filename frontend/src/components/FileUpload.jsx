@@ -40,26 +40,35 @@ export default function FileUpload({ file, setFile }) {
 
     if (file) {
         return (
-            <div className="p-6 border-2 border-primary/25 bg-primary/5 rounded-2xl flex items-center gap-4">
-                <div className="p-4 bg-primary/15 rounded-xl flex items-center justify-center shrink-0 border border-primary/20">
-                    <FileText className="size-6 text-primary" />
+            <div className="p-6 border-2 border-emerald-500/30 bg-emerald-500/5 rounded-2xl">
+                <div className="flex items-center gap-4">
+                    <div className="p-4 bg-emerald-500/15 rounded-xl flex items-center justify-center shrink-0 border border-emerald-500/20">
+                        <FileText className="size-6 text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-foreground truncate mb-1">
+                            {file.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                            {formatFileSize(file.size)}
+                        </p>
+                    </div>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setFile(null)}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                    >
+                        <X className="size-5" />
+                    </Button>
                 </div>
-                <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate mb-1">
-                        {file.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                        {formatFileSize(file.size)}
-                    </p>
+                <div className="mt-4 pt-4 border-t border-emerald-500/20 flex items-center gap-2 text-sm text-emerald-600">
+                    <span className="size-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        ✓
+                    </span>
+                    <span className="font-medium">Ready to analyze</span>
+                    <span className="text-muted-foreground">• Click "Run Analysis" to proceed</span>
                 </div>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setFile(null)}
-                    className="shrink-0"
-                >
-                    <X className="size-5" />
-                </Button>
             </div>
         );
     }
@@ -70,10 +79,18 @@ export default function FileUpload({ file, setFile }) {
             onDragOver={onDragOver}
             onDragLeave={onDragLeave}
             className={cn(
-                "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all",
-                isDragging ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                "border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all relative overflow-hidden group",
+                isDragging
+                    ? "border-primary bg-primary/10 scale-[1.02]"
+                    : "border-muted-foreground/30 hover:border-primary/50 hover:bg-primary/5"
             )}
         >
+            {/* Subtle gradient accent */}
+            <div className={cn(
+                "absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity",
+                isDragging ? "opacity-100" : "group-hover:opacity-50"
+            )} />
+
             <input
                 type="file"
                 id="file-upload"
@@ -83,22 +100,25 @@ export default function FileUpload({ file, setFile }) {
             />
             <label
                 htmlFor="file-upload"
-                className="cursor-pointer block"
+                className="cursor-pointer block relative z-10"
             >
                 <div className={cn(
-                    "size-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4 transition-transform",
-                    isDragging && "scale-110"
+                    "size-20 bg-primary/10 border-2 border-primary/20 rounded-full flex items-center justify-center mx-auto mb-6 transition-all",
+                    isDragging && "scale-110 bg-primary/20"
                 )}>
-                    <Upload className="size-8 text-primary" />
+                    <Upload className={cn(
+                        "size-10 text-primary transition-transform",
+                        isDragging && "animate-bounce"
+                    )} />
                 </div>
-                <h3 className="font-display text-lg font-semibold mb-2">
+                <h3 className="font-display text-xl font-bold mb-3 text-foreground">
                     Drop your spotlist here
                 </h3>
-                <p className="text-sm text-muted-foreground mb-1">
-                    or click to browse
+                <p className="text-base text-muted-foreground mb-2">
+                    or <span className="text-primary font-medium underline underline-offset-2">click to browse</span>
                 </p>
-                <p className="text-xs text-muted-foreground">
-                    Accepted: .csv, .xlsx, .xls (max 10MB)
+                <p className="text-sm text-muted-foreground/70">
+                    Supports CSV, Excel (.xlsx, .xls) • Max 10MB
                 </p>
             </label>
         </div>

@@ -175,66 +175,38 @@ class ReachFrequencyReport:
         categories: Optional[Sequence[int]] = None,
         subcategories: Optional[Sequence[int]] = None,
         frequency: str = "1+",  # Default frequency filter
-        showdataby: str = "By Day",  # "By Day", "By weekday", "By calendar week", etc.
+        showdataby: str = "period",  # "period", "By day", "By weekday", "By calendar week", etc.
         poll_interval: int = 5,
         timeout: int = 600,
     ) -> Dict[str, Any]:
         """
-        Get Reach & Frequency analysis using Deep Analysis Advertising Report.
+        Get Reach & Frequency analysis using Deep Analysis Channel Event Report.
         
-        Args:
-            date_from: Start date (YYYY-MM-DD)
-            date_to: End date (YYYY-MM-DD)
-            channel_ids: List of channel IDs
-            company_ids: Optional company filter
-            brand_ids: Optional brand filter
-            product_ids: Optional product filter
-            profiles: Optional audience profile filter
-            dayparts: Optional daypart filter
-            industries: Optional industry filter
-            categories: Optional category filter
-            subcategories: Optional subcategory filter
-            frequency: Frequency filter (default: "1+")
-            showdataby: Data grouping option (default: "By Day")
-            poll_interval: Polling interval in seconds
-            timeout: Maximum wait time in seconds
-            
-        Returns:
-            Dictionary with reach and frequency data
+        Note: Switched from Advertising Report to Channel Event Report for better reliability.
+        Channel Event Report has simpler requirements and is more stable.
         """
-        # Use Deep Analysis Advertising Report with reach variable
+        # Use Channel Event Report - simpler and more reliable than Advertising Report
+        # Valid variables for Channel/Event: amr-perc, reach (%), reach-avg, share, ats-avg, atv-avg
+        
         payload = {
+            "splitby": "-1",  # No time split
             "date_from": date_from,
             "date_to": date_to,
+            "threshold": "5sec",  # Contact threshold
             "channels": channel_ids,
-            "variables": ["reach (%)"],  # Primary variable for reach analysis
-            "frequency": frequency,
-            "showdataby": showdataby,
+            "profiles": list(profiles) if profiles else [],
+            "dayparts": list(dayparts) if dayparts else [],
+            "variables": ["reach (%)", "share", "amr-perc", "ats-avg"],
+            "showdataby": "period",  # Aggregate across period
+            "epg_categories": [],
         }
         
-        if company_ids:
-            payload["companies"] = list(company_ids)
-        if brand_ids:
-            payload["brands"] = list(brand_ids)
-        if product_ids:
-            payload["products"] = list(product_ids)
-        if profiles:
-            payload["profiles"] = list(profiles)
-        if dayparts:
-            payload["dayparts"] = list(dayparts)
-        if industries:
-            payload["industries"] = list(industries)
-        if categories:
-            payload["categories"] = list(categories)
-        if subcategories:
-            payload["subcategories"] = list(subcategories)
-        
         return self.manager.get_complete_report(
-            ReportType.DEEP_ANALYSIS_ADVERTISING,
+            ReportType.DEEP_ANALYSIS_CHANNEL_EVENT,
             payload,
             poll_interval=poll_interval,
             timeout=timeout,
-            flatten=False,  # Deep analysis reports have specific structure
+            flatten=True,  # Flatten for easier processing
         )
 
 

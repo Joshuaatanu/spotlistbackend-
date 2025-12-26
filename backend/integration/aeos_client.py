@@ -148,6 +148,11 @@ class AEOSClient:
         max_retries = 2
         for attempt in range(max_retries):
             try:
+                # Debug: print the payload
+                if method == "initiateDeepAnalysisAdvertisingReport":
+                    import json
+                    print(f"[DEBUG] Sending to {method}:")
+                    print(json.dumps(payload, indent=2, default=str))
                 r = self.session.post(
                     url,
                     json=payload,

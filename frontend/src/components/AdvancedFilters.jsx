@@ -26,6 +26,11 @@ export default function AdvancedFilters({ data, fieldMap, onFilterChange, isExpa
         maxDuration: ''
     });
 
+    // Early return if no data
+    if (!data || !Array.isArray(data) || data.length === 0) {
+        return null;
+    }
+
     // Extract unique values for dropdowns
     const channels = [...new Set(data.map(d => d[fieldMap?.program_column] || d.Channel || d.program_original).filter(Boolean))].sort();
     const dayparts = [...new Set(data.map(d => d[fieldMap?.daypart_column] || d['Airing daypart']).filter(Boolean))].sort();
