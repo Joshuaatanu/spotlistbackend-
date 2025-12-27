@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import FileUpload from './FileUpload';
 import AeosDataFetch from './AeosDataFetchOptimized';
 import ConfigPanel from './ConfigPanel';
+import ReportTypeSelector from './ReportTypeSelector';
 
 const STEPS = [
     { id: 1, title: 'Select Data', description: 'Choose your data source' },
@@ -28,6 +29,10 @@ export default function AnalysisWizard({
     setCompanyName,
     companyId,
     setCompanyId,
+    competitorCompanyName,
+    setCompetitorCompanyName,
+    competitorCompanyId,
+    setCompetitorCompanyId,
     brandIds,
     setBrandIds,
     productIds,
@@ -66,7 +71,7 @@ export default function AnalysisWizard({
             return !!file;
         } else {
             // AEOS requires company (for some reports) and date range
-            const requiresCompany = ['spotlist', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+            const requiresCompany = ['spotlist', 'competitor', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
             return ((!requiresCompany || companyName) && dateFrom && dateTo) || collectedData;
         }
     }, [dataSource, file, companyName, dateFrom, dateTo, reportType, collectedData]);
@@ -146,7 +151,7 @@ export default function AnalysisWizard({
             </div>
 
             {/* Step Content */}
-            <Card className="mb-6">
+            <Card className="mb-6 overflow-visible">
                 {/* Step 1: Data Source */}
                 {currentStep === 1 && (
                     <>
@@ -178,13 +183,24 @@ export default function AnalysisWizard({
 
                             <div data-tour="upload-zone">
                                 {dataSource === 'file' ? (
-                                    <FileUpload file={file} setFile={setFile} />
+                                    <div className="flex flex-col gap-4">
+                                        {/* Report Type Selector for File Upload */}
+                                        <ReportTypeSelector
+                                            reportType={reportType || 'spotlist'}
+                                            setReportType={setReportType || (() => { })}
+                                        />
+                                        <FileUpload file={file} setFile={setFile} />
+                                    </div>
                                 ) : (
                                     <AeosDataFetch
                                         companyName={companyName}
                                         setCompanyName={setCompanyName}
                                         companyId={companyId}
                                         setCompanyId={setCompanyId}
+                                        competitorCompanyName={competitorCompanyName}
+                                        setCompetitorCompanyName={setCompetitorCompanyName}
+                                        competitorCompanyId={competitorCompanyId}
+                                        setCompetitorCompanyId={setCompetitorCompanyId}
                                         brandIds={brandIds}
                                         setBrandIds={setBrandIds}
                                         productIds={productIds}
@@ -259,6 +275,8 @@ export default function AnalysisWizard({
                                     <div className="font-semibold">
                                         {dataSource === 'file' ? (
                                             <>📁 {file?.name || 'No file selected'}</>
+                                        ) : reportType === 'competitor' && competitorCompanyName ? (
+                                            <>🔗 Competitor: {companyName} vs {competitorCompanyName} ({dateFrom} to {dateTo})</>
                                         ) : (
                                             <>🔗 AEOS: {companyName || 'All companies'} ({dateFrom} to {dateTo})</>
                                         )}

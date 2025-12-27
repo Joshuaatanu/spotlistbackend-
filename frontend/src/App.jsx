@@ -27,6 +27,8 @@ function App() {
   const [file, setFile] = useState(null);
   const [companyName, setCompanyName] = useState('');
   const [companyId, setCompanyId] = useState(null);
+  const [competitorCompanyName, setCompetitorCompanyName] = useState('');
+  const [competitorCompanyId, setCompetitorCompanyId] = useState(null);
   const [brandIds, setBrandIds] = useState([]);
   const [productIds, setProductIds] = useState([]);
 
@@ -99,7 +101,7 @@ function App() {
   const handleAnalyzeAeos = async () => {
     // Company name is required only for certain report types
     // Note: topTen and reachFrequency do NOT require company name
-    const requiresCompany = ['spotlist', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+    const requiresCompany = ['spotlist', 'competitor', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
     if ((requiresCompany && !companyName) || !dateFrom || !dateTo) return;
 
     setLoading(true);
@@ -109,19 +111,22 @@ function App() {
 
     const formData = new FormData();
     formData.append('company_name', companyName || '');
+    formData.append('competitor_company_name', competitorCompanyName || '');
     formData.append('date_from', dateFrom);
     formData.append('date_to', dateTo);
-    formData.append('report_type', reportType || 'spotlist');
+    // Competitor analysis uses spotlist data, so map it to 'spotlist' for backend
+    const backendReportType = reportType === 'competitor' ? 'spotlist' : (reportType || 'spotlist');
+    formData.append('report_type', backendReportType);
     // Always send channel_filter, even if empty (backend will handle it)
     formData.append('channel_filter', channelFilter || '');
     // Add Top Ten subtype (always send, defaults to 'spots' if not Top Ten)
     formData.append('top_ten_subtype', reportType === 'topTen' ? (topTenSubtype || 'spots') : 'spots');
 
-    // Add brand and product IDs (for spotlist reports)
-    if (reportType === 'spotlist' && brandIds && brandIds.length > 0) {
+    // Add brand and product IDs (for spotlist and competitor reports)
+    if ((reportType === 'spotlist' || reportType === 'competitor') && brandIds && brandIds.length > 0) {
       formData.append('brand_ids', JSON.stringify(brandIds));
     }
-    if (reportType === 'spotlist' && productIds && productIds.length > 0) {
+    if ((reportType === 'spotlist' || reportType === 'competitor') && productIds && productIds.length > 0) {
       formData.append('product_ids', JSON.stringify(productIds));
     }
 
@@ -404,6 +409,10 @@ function App() {
                     setCompanyName={setCompanyName}
                     companyId={companyId}
                     setCompanyId={setCompanyId}
+                    competitorCompanyName={competitorCompanyName}
+                    setCompetitorCompanyName={setCompetitorCompanyName}
+                    competitorCompanyId={competitorCompanyId}
+                    setCompetitorCompanyId={setCompetitorCompanyId}
                     brandIds={brandIds}
                     setBrandIds={setBrandIds}
                     productIds={productIds}

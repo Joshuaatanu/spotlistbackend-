@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, TrendingUp, Clock, FileText, Activity, ChevronDown, Check } from 'lucide-react';
+import { BarChart3, TrendingUp, Clock, FileText, Activity, ChevronDown, Check, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -11,6 +11,12 @@ const REPORT_TYPES = {
     description: 'Detailed spotlist with XRP, SPEND, and other metrics',
     icon: FileText,
     default: true
+  },
+  competitor: {
+    id: 'competitor',
+    name: 'Competitor Analysis',
+    description: 'Compare TV advertising between brands (e.g., eBay vs Amazon)',
+    icon: Users
   },
   topTen: {
     id: 'topTen',

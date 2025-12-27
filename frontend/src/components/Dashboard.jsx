@@ -13,6 +13,7 @@ import ReachFrequencyReportView from './ReachFrequencyReportView';
 import DeepAnalysisReportView from './DeepAnalysisReportView';
 import DaypartAnalysisReportView from './DaypartAnalysisReportView';
 import DashboardOverview from './DashboardOverview';
+import CompetitorComparison from './CompetitorComparison';
 import { enrichDataArray, initializeMetadata } from '../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +29,7 @@ import { useToast } from '@/hooks/useToast';
 // Available view modes for switching
 const VIEW_MODES = [
     { id: 'spotlist', label: 'Spotlist', icon: Layers, description: 'Double booking analysis' },
+    { id: 'competitor', label: 'Competitor', icon: Users, description: 'Brand comparison' },
     { id: 'daypartAnalysis', label: 'Daypart', icon: Clock, description: 'Performance by time' },
     { id: 'topTen', label: 'Top Ten', icon: Trophy, description: 'Rankings analysis' },
     { id: 'deepAnalysis', label: 'KPIs', icon: Activity, description: 'Channel performance' },
@@ -370,6 +372,8 @@ export default function Dashboard({ data }) {
     // Render appropriate view based on reportType
     const renderReportView = () => {
         switch (reportType) {
+            case 'competitor':
+                return <CompetitorComparison data={displayData} fieldMap={fieldMap} />;
             case 'topTen':
                 return <TopTenReportView data={displayData} reportType={reportType} />;
             case 'reachFrequency':

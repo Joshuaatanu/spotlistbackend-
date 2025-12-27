@@ -93,6 +93,22 @@ const REPORT_CONFIGS = {
         showChannelFilter: true,
         showAdvancedFilters: true,
         defaultDateRange: 30
+    },
+    competitor: {
+        name: 'Competitor Analysis',
+        requiredParams: ['companyName', 'dateFrom', 'dateTo'],
+        optionalParams: ['channelFilter', 'brandIds'],
+        description: 'Compare TV advertising between brands (e.g., eBay vs Amazon)',
+        tips: [
+            'Select a company to analyze their brand competition',
+            'After analysis, switch to Competitor view to compare brands',
+            'Best used with spotlist data that includes multiple brands'
+        ],
+        showCompanySelector: true,
+        showChannelFilter: true,
+        showAdvancedFilters: true,
+        showBrandSelector: true,
+        defaultDateRange: 30
     }
 };
 
@@ -101,6 +117,10 @@ export default function AeosDataFetchOptimized({
     setCompanyName,
     companyId,
     setCompanyId,
+    competitorCompanyName,
+    setCompetitorCompanyName,
+    competitorCompanyId,
+    setCompetitorCompanyId,
     brandIds,
     setBrandIds,
     productIds,
@@ -196,7 +216,7 @@ export default function AeosDataFetchOptimized({
     };
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 overflow-visible">
             {/* Report Type Selector */}
             <div>
                 <ReportTypeSelector
@@ -267,20 +287,53 @@ export default function AeosDataFetchOptimized({
             {/* Company Selector */}
             {reportConfig.showCompanySelector && (
                 <div>
-                    <CompanySelector
-                        companyName={companyName}
-                        setCompanyName={setCompanyName}
-                        setCompanyId={setCompanyId}
-                    />
-                    {reportConfig.requiredParams.includes('companyName') && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                            * Required for this report type
-                        </p>
+                    {reportType === 'competitor' ? (
+                        <>
+                            {/* Two Company Selectors for Competitor Analysis */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-3 border rounded-lg bg-muted/30">
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                                        🏢 Company A
+                                    </p>
+                                    <CompanySelector
+                                        companyName={companyName}
+                                        setCompanyName={setCompanyName}
+                                        setCompanyId={setCompanyId}
+                                    />
+                                </div>
+                                <div className="p-3 border rounded-lg bg-muted/30">
+                                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">
+                                        🏢 Company B (Competitor)
+                                    </p>
+                                    <CompanySelector
+                                        companyName={competitorCompanyName}
+                                        setCompanyName={setCompetitorCompanyName}
+                                        setCompanyId={setCompetitorCompanyId}
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-amber-600 mt-2 font-medium">
+                                💡 Select two companies to compare their TV advertising performance
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <CompanySelector
+                                companyName={companyName}
+                                setCompanyName={setCompanyName}
+                                setCompanyId={setCompanyId}
+                            />
+                            {reportConfig.requiredParams.includes('companyName') && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    * Required for this report type
+                                </p>
+                            )}
+                        </>
                     )}
                 </div>
             )}
 
-            {/* Brand Selector */}
+            {/* Brand Selector - for spotlist only (not competitor) */}
             {reportType === 'spotlist' && companyId && (
                 <BrandSelector
                     companyId={companyId}

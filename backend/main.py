@@ -864,6 +864,7 @@ async def stream_progress_updates(
     profiles: Optional[List[int]] = None,
     brand_ids: Optional[List[int]] = None,
     product_ids: Optional[List[int]] = None,
+    competitor_company_name: Optional[str] = None,  # Second company for competitor analysis
 ) -> AsyncGenerator[str, None]:
     """Generator that yields progress updates as SSE events"""
     
@@ -1207,7 +1208,20 @@ async def stream_progress_updates(
         # Default: Spotlist Report (existing logic)
         # 3. Fetch spotlists for each channel and filter by company
         all_rows = []
-        target = company_name.lower()
+        
+        # For competitor analysis, we fetch data for both companies
+        target_companies = []
+        if company_name:
+            target_companies.append(company_name.lower())
+        if competitor_company_name:
+            target_companies.append(competitor_company_name.lower())
+        
+        # If we have both companies for competitor mode, show a message
+        if len(target_companies) == 2:
+            yield send_progress(12, f"Competitor mode: fetching data for both {company_name} and {competitor_company_name}...", "info")
+        
+        # target is used for backward compatibility (will check against target_companies list)
+        target = company_name.lower() if company_name else ""
         channels_processed = 0
         channels_with_data = 0
         
@@ -1352,8 +1366,10 @@ async def stream_progress_updates(
                         channel_matches += 1
                     else:
                         # Standard filtering - filter by company name substring
+                        # For competitor mode, match any of the target companies
                         company = str(r.get("Company") or r.get("Kunde") or "").lower()
-                        if target in company:
+                        matches_company = any(tc in company for tc in target_companies) if target_companies else (target in company if target else True)
+                        if matches_company:
                             r["Channel"] = channel_caption
                             all_rows.append(r)
                             channel_matches += 1
@@ -1440,6 +1456,7 @@ async def stream_progress_updates(
 @app.post("/analyze-from-aeos")
 async def analyze_from_aeos(
     company_name: str = Form(""),  # Optional - not required for Top Ten reports
+    competitor_company_name: str = Form(""),  # Second company for competitor analysis
     date_from: str = Form(...),
     date_to: str = Form(...),
     creative_match_mode: int = Form(1),
@@ -1504,6 +1521,7 @@ async def analyze_from_aeos(
             profiles=profiles_list,
             brand_ids=brand_ids_list,
             product_ids=product_ids_list,
+            competitor_company_name=competitor_company_name if competitor_company_name else None,
         ),
         media_type="text/event-stream",
         headers={
