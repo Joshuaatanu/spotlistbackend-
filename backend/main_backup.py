@@ -1,13 +1,3 @@
-"""
-Spotlist Checker API - Main Application Entry Point
-
-This is the FastAPI application for the TV advertising analytics platform.
-The application is organized into modular routers for better maintainability.
-
-Phase 1 Refactoring: Extracted endpoints into modular routers while keeping
-complex analysis logic in this file for now.
-"""
-
 import io
 import sys
 from datetime import date, datetime, time
@@ -71,42 +61,7 @@ except ImportError:
     print("Warning: Supabase client not available. Database features disabled.")
     SUPABASE_AVAILABLE = False
 
-# ============================================================================
-# Application Setup with Enhanced OpenAPI Documentation
-# ============================================================================
-
-app = FastAPI(
-    title="Spotlist Checker API",
-    description="""
-TV advertising analytics platform for detecting double bookings.
-
-## Features
-
-- **Double Booking Detection**: Identify overlapping ad spots within configurable time windows
-- **Multiple Data Sources**: Upload CSV/Excel files or fetch data from AEOS API
-- **Metadata Enrichment**: Channel, daypart, EPG category, and company metadata
-- **AI Insights**: Generate insights using OpenAI GPT models
-- **Analysis History**: Persist and retrieve previous analyses
-
-## Report Types
-
-- Spotlist Analysis
-- Top Ten Report
-- Reach/Frequency Analysis
-- Daypart Analysis
-- Competitor Comparison
-""",
-    version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_tags=[
-        {"name": "Health", "description": "Health check endpoints"},
-        {"name": "Database", "description": "Analysis and configuration persistence"},
-        {"name": "Metadata", "description": "AEOS metadata for enrichment and filtering"},
-        {"name": "Analysis", "description": "Spotlist analysis endpoints"},
-        {"name": "AI Insights", "description": "AI-powered insights generation"},
-    ]
-)
+app = FastAPI(title="Spotlist Checker API")
 
 # Configure CORS
 app.add_middleware(

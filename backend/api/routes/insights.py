@@ -1,0 +1,86 @@
+"""
+AI Insights endpoint using OpenAI.
+"""
+
+from typing import Any
+from fastapi import APIRouter, HTTPException
+
+from api.models.requests import InsightRequest
+from api.dependencies import OPENAI_AVAILABLE, openai
+
+router = APIRouter(tags=["AI Insights"])
+
+
+@router.post("/generate-insights", summary="Generate AI Insights")
+async def generate_insights(request: InsightRequest):
+    """
+    Generate AI-powered insights from analysis metrics.
+    
+    Uses OpenAI GPT models to analyze spotlist metrics and provide
+    recommendations based on industry benchmarks and invendo methodology.
+    
+    Args:
+        request: InsightRequest with metrics dict and OpenAI API key
+        
+    Returns:
+        Dict with 'insights' key containing the AI-generated analysis
+        
+    Raises:
+        HTTPException: If OpenAI not available, API key missing, or API error
+    """
+    if not OPENAI_AVAILABLE or openai is None:
+        raise HTTPException(status_code=500, detail="OpenAI library not installed on server.")
+    
+    if not request.apiKey:
+        raise HTTPException(status_code=400, detail="API Key is required.")
+
+    try:
+        client = openai.OpenAI(api_key=request.apiKey)
+        
+        # Construct a summary of the metrics
+        m = request.metrics
+        summary = f"""
+        Total Spend: €{m.get('total_cost', 0):,.2f}
+        Double Booking Spend: €{m.get('double_cost', 0):,.2f} ({m.get('percent_cost', 0)*100:.1f}%)
+        Total Spots: {m.get('total_spots', 0)}
+        Double Spots: {m.get('double_spots', 0)} ({m.get('percent_spots', 0)*100:.1f}%)
+        """
+        
+        if 'total_xrp' in m:
+            summary += f"Total XRP: {m.get('total_xrp', 0):.1f}\n"
+        if 'cost_per_xrp' in m:
+            summary += f"Cost per XRP: €{m.get('cost_per_xrp', 0):.2f}\n"
+
+        prompt = f"""
+        You are a Media Audit Expert following invendo TV Audit methodology. Analyze the following TV spotlist metrics for potential inefficiencies and double bookings.
+        
+        Data Summary:
+        {summary}
+        
+        Industry Benchmarks:
+        - Double bookings should be < 5% of total spots (industry standard)
+        - Efficient spots should represent > 60% of total spend
+        - Low incremental reach spots (<5% incremental) should be minimized
+        
+        Please provide:
+        1. An executive summary of the efficiency compared to industry standards.
+        2. Key concerns regarding double bookings (current rate: {m.get('percent_spots', 0)*100:.1f}% vs. <5% target).
+        3. Spot efficiency breakdown (efficient vs. double bookings vs. low incremental).
+        4. Specific recommendations for optimization based on invendo audit methodology.
+        
+        Keep it concise, professional, and actionable.
+        """
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Use a fast, capable model
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant for media analysis."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500
+        )
+        
+        return {"insights": response.choices[0].message.content}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
