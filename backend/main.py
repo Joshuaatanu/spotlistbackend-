@@ -118,6 +118,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configure structured logging (optional - enable in production)
+import os
+if os.getenv("ENABLE_LOGGING_MIDDLEWARE", "false").lower() == "true":
+    try:
+        from core.logging import setup_logging
+        from api.middleware import LoggingMiddleware
+        
+        # Setup structlog
+        json_logs = os.getenv("JSON_LOGS", "false").lower() == "true"
+        log_level = os.getenv("LOG_LEVEL", "INFO")
+        setup_logging(log_level=log_level, json_logs=json_logs)
+        
+        # Add logging middleware
+        app.add_middleware(LoggingMiddleware)
+    except ImportError as e:
+        print(f"Warning: Could not enable logging middleware: {e}")
+
 
 def dataframe_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
     """
@@ -1302,15 +1319,39 @@ async def stream_progress_updates(
                     from report_types import EnhancedSpotlistReport
                     enhanced_spotlist = EnhancedSpotlistReport(client)
                     
-                    # Get company ID if company name is provided
-                    company_ids_for_filter = None
+                    # Get company IDs for BOTH companies in competitor mode
+                    company_ids_for_filter = []
+                    from aeos_metadata import AEOSMetadata
+                    metadata = AEOSMetadata(client)
+                    
+                    # Add primary company ID
                     if company_name:
-                        from aeos_metadata import AEOSMetadata
-                        metadata = AEOSMetadata(client)
                         company_obj = await loop.run_in_executor(None, metadata.find_company, company_name)
                         if company_obj:
-                            company_ids_for_filter = [company_obj.get("value") or company_obj.get("id")]
+                            company_ids_for_filter.append(company_obj.get("value") or company_obj.get("id"))
+                            print(f"[DEBUG] Found primary company: {company_name} -> ID: {company_ids_for_filter[-1]}")
                     
+                    # Add competitor company ID for competitor mode
+                    if competitor_company_name:
+                        competitor_obj = await loop.run_in_executor(None, metadata.find_company, competitor_company_name)
+                        if competitor_obj:
+                            company_ids_for_filter.append(competitor_obj.get("value") or competitor_obj.get("id"))
+                            print(f"[DEBUG] Found competitor company: {competitor_company_name} -> ID: {company_ids_for_filter[-1]}")
+                        else:
+                            print(f"[WARNING] Competitor company '{competitor_company_name}' not found in AEOS!")
+                            yield send_progress(15, f"⚠ Warning: Competitor company '{competitor_company_name}' not found in AEOS!", "warning")
+                    
+                    # Log the company IDs being used
+                    if len(company_ids_for_filter) > 1:
+                        yield send_progress(14, f"Fetching data for {len(company_ids_for_filter)} companies: {company_name}, {competitor_company_name}", "info")
+                    
+                    # Convert to None if empty list (API expects None for no filter)
+                    if not company_ids_for_filter:
+                        company_ids_for_filter = None
+                    
+                    print(f"[DEBUG] Final company_ids_for_filter: {company_ids_for_filter}")
+                    
+
                     # Use asyncio timeout to prevent hanging on individual channels
                     try:
                         report_rows = await asyncio.wait_for(
