@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Database, Calendar, Building2, Info, AlertCircle, CheckCircle2, BarChart3 } from 'lucide-react';
 import ReportTypeSelector from './ReportTypeSelector';
 import EnhancedFilters from './EnhancedFilters';
@@ -11,106 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-
-// Report-specific parameter configurations
-const REPORT_CONFIGS = {
-    spotlist: {
-        name: 'Spotlist Report',
-        requiredParams: ['companyName', 'dateFrom', 'dateTo'],
-        optionalParams: ['channelFilter', 'weekdays', 'dayparts', 'epgCategories'],
-        description: 'Detailed spot-by-spot analysis with double booking detection',
-        tips: [
-            'Company name is required for spotlist filtering',
-            'Use channel filter to limit to specific stations',
-            'Weekday/daypart filters help narrow down analysis'
-        ],
-        showCompanySelector: true,
-        showChannelFilter: true,
-        showAdvancedFilters: true,
-        defaultDateRange: 7
-    },
-    topTen: {
-        name: 'Top Ten Report',
-        requiredParams: ['dateFrom', 'dateTo'],
-        optionalParams: ['channelFilter', 'industries', 'categories'],
-        description: 'Top 10 rankings by category (ads, events, or channels)',
-        tips: [
-            '⚠️ API limitation: Only supports "Yesterday" or "Last 7 days" periods',
-            'Date range will be automatically converted to closest supported period',
-            'Select subtype: Spots (ads by XRP), Events (by Share), or Channels (by Share)',
-            'Company filter is not available for Top Ten reports'
-        ],
-        showCompanySelector: false,
-        showChannelFilter: false,
-        showAdvancedFilters: false,
-        defaultDateRange: 7,
-        showTopTenSubtype: true,
-        showPeriodInfo: true
-    },
-    reachFrequency: {
-        name: 'Reach & Frequency',
-        requiredParams: ['dateFrom', 'dateTo', 'channelFilter'],
-        optionalParams: ['profiles', 'dayparts'],
-        description: 'Channel reach and audience share analysis (per-channel metrics)',
-        tips: [
-            'Analyzes channel performance, not advertiser-specific data',
-            'At least one channel must be specified',
-            'Returns: reach %, share, AMR%, ATS',
-            'Profile/daypart filters available for demographic targeting'
-        ],
-        showCompanySelector: false,  // Channel Event Report doesn't filter by company
-        showChannelFilter: true,
-        channelFilterRequired: true,
-        showAdvancedFilters: true,
-        defaultDateRange: 14
-    },
-    deepAnalysis: {
-        name: 'Deep Analysis (KPIs)',
-        requiredParams: ['companyName', 'dateFrom', 'dateTo'],
-        optionalParams: ['channelFilter'],
-        description: 'In-depth KPI analysis including AMR%, reach%, share, and more',
-        tips: [
-            'Company name is required for KPI analysis',
-            'Best used with 1-4 week date ranges',
-            'Provides channel/event level performance metrics'
-        ],
-        showCompanySelector: true,
-        showChannelFilter: true,
-        showAdvancedFilters: false,
-        defaultDateRange: 14
-    },
-    daypartAnalysis: {
-        name: 'Daypart Analysis',
-        requiredParams: ['companyName', 'dateFrom', 'dateTo'],
-        optionalParams: ['channelFilter', 'dayparts'],
-        description: 'Performance breakdown by time-of-day segments',
-        tips: [
-            'Company name is required',
-            'Analyzes advertising performance across different dayparts',
-            'Use daypart filters to focus on specific time segments'
-        ],
-        showCompanySelector: true,
-        showChannelFilter: true,
-        showAdvancedFilters: true,
-        defaultDateRange: 30
-    },
-    competitor: {
-        name: 'Competitor Analysis',
-        requiredParams: ['companyName', 'dateFrom', 'dateTo'],
-        optionalParams: ['channelFilter', 'brandIds'],
-        description: 'Compare TV advertising between brands (e.g., eBay vs Amazon)',
-        tips: [
-            'Select a company to analyze their brand competition',
-            'After analysis, switch to Competitor view to compare brands',
-            'Best used with spotlist data that includes multiple brands'
-        ],
-        showCompanySelector: true,
-        showChannelFilter: true,
-        showAdvancedFilters: true,
-        showBrandSelector: true,
-        defaultDateRange: 30
-    }
-};
+import { useAeosForm, REPORT_CONFIGS, getDefaultDateTo, getDefaultDateFrom } from '@/hooks/useAeosForm';
 
 export default function AeosDataFetchOptimized({
     companyName,
@@ -140,80 +41,23 @@ export default function AeosDataFetchOptimized({
 }) {
     const [showHelp, setShowHelp] = useState(false);
 
-    const reportConfig = REPORT_CONFIGS[reportType] || REPORT_CONFIGS.spotlist;
+    // Use custom hook for form validation and utilities
+    const {
+        reportConfig,
+        validation,
+        applyDatePreset,
+        dateRangeInfo,
+        formSummary,
+    } = useAeosForm({
+        companyName,
+        dateFrom,
+        dateTo,
+        channelFilter,
+        reportType,
+        setDateFrom,
+        setDateTo,
+    });
 
-    const getDefaultDateTo = () => {
-        const today = new Date();
-        return today.toISOString().split('T')[0];
-    };
-
-    const getDefaultDateFrom = (daysAgo) => {
-        const today = new Date();
-        const pastDate = new Date(today);
-        pastDate.setDate(today.getDate() - daysAgo);
-        return pastDate.toISOString().split('T')[0];
-    };
-
-    useEffect(() => {
-        if (!dateFrom) {
-            setDateFrom(getDefaultDateFrom(reportConfig.defaultDateRange));
-        }
-        if (!dateTo) {
-            setDateTo(getDefaultDateTo());
-        }
-    }, []);
-
-    useEffect(() => {
-        // Optional: reset dates when changing report types
-    }, [reportType]);
-
-    const validation = useMemo(() => {
-        const errors = [];
-        const warnings = [];
-
-        if (reportConfig.requiredParams.includes('companyName') && !companyName?.trim()) {
-            errors.push('Company name is required for this report type');
-        }
-        if (reportConfig.requiredParams.includes('dateFrom') && !dateFrom) {
-            errors.push('Start date is required');
-        }
-        if (reportConfig.requiredParams.includes('dateTo') && !dateTo) {
-            errors.push('End date is required');
-        }
-        if (reportConfig.channelFilterRequired && !channelFilter?.trim()) {
-            errors.push('Channel filter is required for this report type');
-        }
-
-        if (dateFrom && dateTo) {
-            const fromDate = new Date(dateFrom);
-            const toDate = new Date(dateTo);
-            const daysDiff = Math.ceil((toDate - fromDate) / (1000 * 60 * 60 * 24));
-
-            if (daysDiff < 0) {
-                errors.push('End date must be after start date');
-            } else if (daysDiff > 90) {
-                warnings.push('Date range exceeds 90 days - report may take longer to generate');
-            } else if (daysDiff > 365) {
-                errors.push('Date range cannot exceed 365 days');
-            }
-        }
-
-        if (reportType === 'reachFrequency' && channelFilter && channelFilter.split(',').length > 5) {
-            warnings.push('Reach & Frequency works best with 1-5 channels');
-        }
-
-        return {
-            isValid: errors.length === 0,
-            errors,
-            warnings,
-            canProceed: errors.length === 0
-        };
-    }, [companyName, dateFrom, dateTo, channelFilter, reportType, reportConfig]);
-
-    const applyDatePreset = (days) => {
-        setDateTo(getDefaultDateTo());
-        setDateFrom(getDefaultDateFrom(days));
-    };
 
     return (
         <div className="flex flex-col gap-4 overflow-visible">

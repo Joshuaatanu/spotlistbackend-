@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Filter, X, Settings2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { ChevronDown, ChevronUp, Filter, X, Settings2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useDebounce } from 'use-debounce';
 import { getDisplayName } from '../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,13 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 const DEFAULT_COLUMNS = {
     channel: true,
@@ -20,6 +28,8 @@ const DEFAULT_COLUMNS = {
     spend: true,
     creative: true,
 };
+
+const PAGE_SIZES = [25, 50, 100, 250];
 
 export default function DoubleBookingsTable({ data, fieldMap }) {
     const [sortColumn, setSortColumn] = useState(null);
@@ -32,9 +42,22 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
         return saved ? JSON.parse(saved) : DEFAULT_COLUMNS;
     });
 
+    // Pagination state
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+
+    // Debounced filter values for performance
+    const [debouncedFilterChannel] = useDebounce(filterChannel, 300);
+    const [debouncedFilterDate] = useDebounce(filterDate, 300);
+
     useEffect(() => {
         localStorage.setItem('tableColumns', JSON.stringify(visibleColumns));
     }, [visibleColumns]);
+
+    // Reset to page 1 when filters change
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [debouncedFilterChannel, debouncedFilterDate, sortColumn, sortDirection]);
 
     const toggleColumn = (column) => {
         setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }));
@@ -57,40 +80,52 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
             'Unknown';
     }))].sort();
 
-    let filteredData = data.filter(item => {
-        const channel = getDisplayName(item, 'channel') ||
-            item[fieldMap?.program_column] ||
-            item.program_original ||
-            item.program_norm ||
-            item.channel_display ||
-            'Unknown';
-        const date = item.timestamp ? item.timestamp.split('T')[0] : '';
+    // Memoize filtered and sorted data for performance
+    const filteredData = useMemo(() => {
+        let result = data.filter(item => {
+            const channel = getDisplayName(item, 'channel') ||
+                item[fieldMap?.program_column] ||
+                item.program_original ||
+                item.program_norm ||
+                item.channel_display ||
+                'Unknown';
+            const date = item.timestamp ? item.timestamp.split('T')[0] : '';
 
-        if (filterChannel && channel !== filterChannel) return false;
-        if (filterDate && date !== filterDate) return false;
-        return true;
-    });
-
-    if (sortColumn) {
-        filteredData = [...filteredData].sort((a, b) => {
-            let aVal = a[sortColumn];
-            let bVal = b[sortColumn];
-
-            if (sortColumn === 'timestamp') {
-                aVal = aVal ? new Date(aVal).getTime() : 0;
-                bVal = bVal ? new Date(bVal).getTime() : 0;
-            }
-
-            if (sortColumn.includes('cost') || sortColumn.includes('Spend')) {
-                aVal = parseFloat(aVal) || 0;
-                bVal = parseFloat(bVal) || 0;
-            }
-
-            if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-            if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
-            return 0;
+            if (debouncedFilterChannel && channel !== debouncedFilterChannel) return false;
+            if (debouncedFilterDate && date !== debouncedFilterDate) return false;
+            return true;
         });
-    }
+
+        // Apply sorting
+        if (sortColumn) {
+            result = [...result].sort((a, b) => {
+                let aVal = a[sortColumn];
+                let bVal = b[sortColumn];
+
+                if (sortColumn === 'timestamp') {
+                    aVal = aVal ? new Date(aVal).getTime() : 0;
+                    bVal = bVal ? new Date(bVal).getTime() : 0;
+                }
+
+                if (sortColumn.includes('cost') || sortColumn.includes('Spend')) {
+                    aVal = parseFloat(aVal) || 0;
+                    bVal = parseFloat(bVal) || 0;
+                }
+
+                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+
+        return result;
+    }, [data, debouncedFilterChannel, debouncedFilterDate, sortColumn, sortDirection, fieldMap]);
+
+    // Pagination calculations
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedData = filteredData.slice(startIndex, endIndex);
 
     const handleSort = (column) => {
         if (sortColumn === column) {
@@ -254,8 +289,9 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                         </tr>
                     </thead>
                     <tbody>
-                        {filteredData.map((item, index) => {
-                            const isExpanded = expandedRows.has(index);
+                        {paginatedData.map((item, localIndex) => {
+                            const globalIndex = startIndex + localIndex;
+                            const isExpanded = expandedRows.has(globalIndex);
 
                             const matchedSpots = filteredData.filter(other => {
                                 if (other === item) return false;
@@ -270,12 +306,12 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                             return (
                                 <>
                                     <tr
-                                        key={index}
+                                        key={globalIndex}
                                         className={cn(
                                             "cursor-pointer border-b hover:bg-muted/50 transition-colors",
-                                            index % 2 === 1 && "bg-muted/30"
+                                            localIndex % 2 === 1 && "bg-muted/30"
                                         )}
-                                        onClick={() => toggleRow(index)}
+                                        onClick={() => toggleRow(globalIndex)}
                                     >
                                         <td className="px-4 py-3">
                                             {isExpanded ? (
@@ -303,7 +339,7 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                                         )}
                                     </tr>
                                     {isExpanded && (
-                                        <tr key={`${index}-details`}>
+                                        <tr key={`${globalIndex}-details`}>
                                             <td colSpan={1 + Object.values(visibleColumns).filter(Boolean).length} className="p-4 bg-muted/50 border-t">
                                                 <div className="flex flex-col gap-4">
                                                     <div>
@@ -378,6 +414,50 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
             {filteredData.length === 0 && (
                 <div className="p-6 text-center text-muted-foreground">
                     No double bookings match the selected filters.
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {filteredData.length > 0 && (
+                <div className="px-4 py-3 border-t flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm text-muted-foreground">Rows per page:</span>
+                        <Select value={String(pageSize)} onValueChange={(val) => setPageSize(Number(val))}>
+                            <SelectTrigger className="w-[80px] h-8">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PAGE_SIZES.map(size => (
+                                    <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                            {startIndex + 1}-{Math.min(endIndex, filteredData.length)} of {filteredData.length}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                        >
+                            <ChevronLeft className="size-4" />
+                        </Button>
+                        <span className="text-sm px-2">
+                            Page {currentPage} of {totalPages || 1}
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                            disabled={currentPage >= totalPages}
+                        >
+                            <ChevronRight className="size-4" />
+                        </Button>
+                    </div>
                 </div>
             )}
         </div>

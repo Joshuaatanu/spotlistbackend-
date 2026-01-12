@@ -1,5 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye } from 'lucide-react';
+import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
+import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye, Loader2, Calendar, Grid3X3, Sparkles, Target } from 'lucide-react';
+import { useDashboardStore } from '@/stores/dashboardStore';
 import ExcelJS from 'exceljs';
 import MetricsCard from './MetricsCard';
 import { DoubleSpendChart, DoubleCountChart } from './Charts';
@@ -8,12 +9,18 @@ import DoubleBookingsTable from './DoubleBookingsTable';
 import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from './AdditionalMetrics';
 import AdvancedFilters from './AdvancedFilters';
 import AIInsights from './AIInsights';
-import TopTenReportView from './TopTenReportView';
-import ReachFrequencyReportView from './ReachFrequencyReportView';
-import DeepAnalysisReportView from './DeepAnalysisReportView';
-import DaypartAnalysisReportView from './DaypartAnalysisReportView';
+// Lazy load heavy report view components for code splitting
+const TopTenReportView = lazy(() => import('./TopTenReportView'));
+const ReachFrequencyReportView = lazy(() => import('./ReachFrequencyReportView'));
+const DeepAnalysisReportView = lazy(() => import('./DeepAnalysisReportView'));
+const DaypartAnalysisReportView = lazy(() => import('./DaypartAnalysisReportView'));
+const CompetitorComparison = lazy(() => import('./CompetitorComparison'));
+// Lazy load new analytics components
+const DoubleBookingsTimeline = lazy(() => import('./analytics/DoubleBookingsTimeline'));
+const DoubleBookingsHeatmap = lazy(() => import('./analytics/DoubleBookingsHeatmap'));
+const DoubleBookingsInsights = lazy(() => import('./analytics/DoubleBookingsInsights'));
+const CampaignPlanner = lazy(() => import('./analytics/CampaignPlanner'));
 import DashboardOverview from './DashboardOverview';
-import CompetitorComparison from './CompetitorComparison';
 import { enrichDataArray, initializeMetadata } from '../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +33,14 @@ import { KeyboardShortcutsHelp, KeyboardShortcutsButton } from './KeyboardShortc
 import { FullscreenChart } from './FullscreenChart';
 import { useToast } from '@/hooks/useToast';
 
+// Loading fallback for lazy loaded components
+const ReportViewLoading = () => (
+    <div className="flex items-center justify-center p-8">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-muted-foreground">Loading report view...</span>
+    </div>
+);
+
 // Available view modes for switching
 const VIEW_MODES = [
     { id: 'spotlist', label: 'Spotlist', icon: Layers, description: 'Double booking analysis' },
@@ -37,18 +52,31 @@ const VIEW_MODES = [
 
 export default function Dashboard({ data }) {
     const { metrics, window_summaries, data: rawData, field_map: fieldMap, metadata } = data || {};
-    const [filters, setFilters] = useState(null);
-    const [filteredData, setFilteredData] = useState(null);
-    const [enrichedData, setEnrichedData] = useState(null);
-    const [enrichmentLoading, setEnrichmentLoading] = useState(false);
-    const [showShortcuts, setShowShortcuts] = useState(false);
-    const [filtersExpanded, setFiltersExpanded] = useState(false);
-    const [activeView, setActiveView] = useState(null); // null = auto-detect, or manual override
+
+    // Use Zustand store for dashboard state
+    const {
+        filters,
+        setFilters,
+        filteredData,
+        setFilteredData,
+        enrichedData,
+        setEnrichedData,
+        enrichmentLoading,
+        setEnrichmentLoading,
+        showShortcuts,
+        setShowShortcuts,
+        filtersExpanded,
+        toggleFilters,
+        activeView,
+        setActiveView,
+        clearFilters,
+    } = useDashboardStore();
+
     const { toast } = useToast();
 
-    // Keyboard shortcuts
+    // Keyboard shortcuts - use store actions
     useKeyboardShortcuts({
-        'f': () => setFiltersExpanded(prev => !prev),
+        'f': () => toggleFilters(),
         '?': () => setShowShortcuts(true),
         'escape': () => { setShowShortcuts(false); },
     });
@@ -369,22 +397,30 @@ export default function Dashboard({ data }) {
         return <DashboardSkeleton />;
     }
 
-    // Render appropriate view based on reportType
+    // Render appropriate view based on reportType (wrapped in Suspense for lazy loading)
     const renderReportView = () => {
-        switch (reportType) {
-            case 'competitor':
-                return <CompetitorComparison data={displayData} fieldMap={fieldMap} />;
-            case 'topTen':
-                return <TopTenReportView data={displayData} reportType={reportType} />;
-            case 'reachFrequency':
-                return <ReachFrequencyReportView data={displayData || data} reportType={reportType} />;
-            case 'deepAnalysis':
-                return <DeepAnalysisReportView data={displayData} reportType={reportType} />;
-            case 'daypartAnalysis':
-                return <DaypartAnalysisReportView data={displayData} fieldMap={fieldMap} />;
-            default:
-                return null; // Spotlist view is handled separately below
-        }
+        const reportContent = (() => {
+            switch (reportType) {
+                case 'competitor':
+                    return <CompetitorComparison data={displayData} fieldMap={fieldMap} />;
+                case 'topTen':
+                    return <TopTenReportView data={displayData} reportType={reportType} />;
+                case 'reachFrequency':
+                    return <ReachFrequencyReportView data={displayData || data} reportType={reportType} />;
+                case 'deepAnalysis':
+                    return <DeepAnalysisReportView data={displayData} reportType={reportType} />;
+                case 'daypartAnalysis':
+                    return <DaypartAnalysisReportView data={displayData} fieldMap={fieldMap} />;
+                default:
+                    return null; // Spotlist view is handled separately below
+            }
+        })();
+
+        return (
+            <Suspense fallback={<ReportViewLoading />}>
+                {reportContent}
+            </Suspense>
+        );
     };
 
     // For non-spotlist views, render with view switcher

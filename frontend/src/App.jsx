@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Upload, Database, Settings, Clock, FileText, Download, Activity } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
@@ -20,53 +20,41 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { useAnalysisHistory } from './hooks/useAnalysisHistory';
+import { useAnalysisStore } from './stores/analysisStore';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('analyze');
-  const [dataSource, setDataSource] = useState('file'); // 'file' or 'aeos'
-  const [file, setFile] = useState(null);
-  const [companyName, setCompanyName] = useState('');
-  const [companyId, setCompanyId] = useState(null);
-  const [competitorCompanyName, setCompetitorCompanyName] = useState('');
-  const [competitorCompanyId, setCompetitorCompanyId] = useState(null);
-  const [brandIds, setBrandIds] = useState([]);
-  const [productIds, setProductIds] = useState([]);
+  // Get state and actions from Zustand store
+  const {
+    activeTab, setActiveTab,
+    dataSource, setDataSource,
+    file, setFile,
+    companyName, setCompanyName,
+    companyId, setCompanyId,
+    competitorCompanyName, setCompetitorCompanyName,
+    competitorCompanyId, setCompetitorCompanyId,
+    brandIds, setBrandIds,
+    productIds, setProductIds,
+    dateFrom, setDateFrom,
+    dateTo, setDateTo,
+    channelFilter, setChannelFilter,
+    reportType, setReportType,
+    topTenSubtype, setTopTenSubtype,
+    filters, setFilters,
+    config, setConfig,
+    loading, startLoading, stopLoading,
+    results, setResults,
+    error, setError,
+    progress, updateProgress,
+    collectedData, setCollectedData,
+    showWizard, setShowWizard,
+  } = useAnalysisStore();
 
-  // Reset brand and product selections when company changes
-  useEffect(() => {
-    if (!companyId) {
-      setBrandIds([]);
-      setProductIds([]);
-    }
-  }, [companyId]);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [channelFilter, setChannelFilter] = useState('');
-  const [reportType, setReportType] = useState('spotlist');
-  const [topTenSubtype, setTopTenSubtype] = useState('spots'); // 'spots', 'events', or 'channel'
-  const [filters, setFilters] = useState({
-    weekdays: [],
-    dayparts: [],
-    epgCategories: [],
-    profiles: []
-  });
-  const [config, setConfig] = useState({
-    creative_match_mode: 1,
-    creative_match_text: '',
-    time_window_minutes: 60
-  });
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState(null);
-  const [error, setError] = useState(null);
   const { history, saveAnalysis, deleteAnalysis, dbAvailable } = useAnalysisHistory();
-  const [progress, setProgress] = useState({ percentage: 0, message: '', stage: 'info' });
-  const [collectedData, setCollectedData] = useState(null); // Store raw collected data
-  const [showWizard, setShowWizard] = useState(false); // Toggle between dashboard and wizard
 
   const handleAnalyze = async () => {
     if (!file) return;
 
-    setLoading(true);
+    startLoading();
     setError(null);
 
     const formData = new FormData();
@@ -94,7 +82,7 @@ function App() {
       console.error(err);
       setError(err.response?.data?.detail || 'An error occurred during analysis.');
     } finally {
-      setLoading(false);
+      stopLoading();
     }
   };
 
@@ -104,10 +92,10 @@ function App() {
     const requiresCompany = ['spotlist', 'competitor', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
     if ((requiresCompany && !companyName) || !dateFrom || !dateTo) return;
 
-    setLoading(true);
+    startLoading();
     setError(null);
     setCollectedData(null); // Clear any previously collected data
-    setProgress({ percentage: 0, message: 'Starting data collection...', stage: 'info' });
+    updateProgress({ percentage: 0, message: 'Starting data collection...', stage: 'info' });
 
     const formData = new FormData();
     formData.append('company_name', companyName || '');
@@ -184,8 +172,8 @@ function App() {
                   fileName: `${companyName}_${dateFrom}_to_${dateTo}`,
                   timestamp: new Date().toISOString()
                 });
-                setLoading(false);
-                setProgress({
+                stopLoading();
+                updateProgress({
                   percentage: 100,
                   message: `Data collection complete! Found ${data.raw_data.metadata.total_spots} spots.`,
                   stage: 'success'
@@ -203,11 +191,11 @@ function App() {
                 setCollectedData(null); // Clear collected data after analysis
                 saveAnalysis(analysisResult); // Save to database
                 setActiveTab('results');
-                setLoading(false);
+                stopLoading();
                 return;
               } else {
                 // Progress update
-                setProgress({
+                updateProgress({
                   percentage: data.progress || 0,
                   message: data.message || '',
                   stage: data.stage || 'info'
@@ -222,7 +210,7 @@ function App() {
     } catch (err) {
       console.error(err);
       setError(err.message || 'An error occurred during analysis.');
-      setLoading(false);
+      stopLoading();
       setCollectedData(null);
     }
   };
@@ -230,9 +218,9 @@ function App() {
   const handleAnalyzeCollectedData = async () => {
     if (!collectedData) return;
 
-    setLoading(true);
+    startLoading();
     setError(null);
-    setProgress({ percentage: 0, message: 'Processing collected data...', stage: 'info' });
+    updateProgress({ percentage: 0, message: 'Processing collected data...', stage: 'info' });
 
     // Check if this is a non-spotlist report type that doesn't need backend analysis
     const reportType = collectedData.metadata?.report_type;
@@ -254,7 +242,7 @@ function App() {
       setCollectedData(null);
       saveAnalysis(displayResult);
       setActiveTab('results');
-      setLoading(false);
+      stopLoading();
       return;
     }
 
@@ -291,7 +279,7 @@ function App() {
       console.error(err);
       setError(err.response?.data?.detail || 'An error occurred during analysis.');
     } finally {
-      setLoading(false);
+      stopLoading();
     }
   };
 
