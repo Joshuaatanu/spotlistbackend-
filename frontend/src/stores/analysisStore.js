@@ -116,10 +116,11 @@ export const useAnalysisStore = create(
 
                 updateProgress: (progress) => set({ progress }),
 
-                setError: (error) => set({
+                setError: (error) => set((state) => ({
                     error,
-                    loading: false,
-                }),
+                    // Only set loading to false when there's an actual error, not when clearing
+                    ...(error !== null ? { loading: false } : {}),
+                })),
 
                 setResults: (results) => set({
                     results,
@@ -128,10 +129,11 @@ export const useAnalysisStore = create(
                     collectedData: null,
                 }),
 
-                setCollectedData: (collectedData) => set({
+                setCollectedData: (collectedData) => set((state) => ({
                     collectedData,
-                    loading: false,
-                }),
+                    // Only set loading to false when we're setting actual data, not when clearing
+                    ...(collectedData !== null ? { loading: false } : {}),
+                })),
 
                 stopLoading: () => set({ loading: false }),
 

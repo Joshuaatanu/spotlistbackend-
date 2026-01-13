@@ -200,6 +200,10 @@ def detect_data_format(df: pd.DataFrame) -> dict:
             mapping['program'] = columns_lower['sender']
         elif 'kanal' in columns_lower:
             mapping['program'] = columns_lower['kanal']
+        elif 'station' in columns_lower:
+            mapping['program'] = columns_lower['station']
+        elif 'channel' in columns_lower:
+            mapping['program'] = columns_lower['channel']
         
         # Map date
         if 'datum' in columns_lower:
@@ -223,10 +227,15 @@ def detect_data_format(df: pd.DataFrame) -> dict:
                 mapping['cost'] = columns_lower[col_key]
                 kosten_found = True
                 break
-        
+
         if not kosten_found:
-            if 'spend' in columns_lower:
+            # Try other cost column names
+            if 'cost to client' in columns_lower:
+                mapping['cost'] = columns_lower['cost to client']
+            elif 'spend' in columns_lower:
                 mapping['cost'] = columns_lower['spend']
+            elif 'gross' in columns_lower:
+                mapping['cost'] = columns_lower['gross']
             elif 'cost' in columns_lower:
                 mapping['cost'] = columns_lower['cost']
         
@@ -277,7 +286,9 @@ def detect_data_format(df: pd.DataFrame) -> dict:
         mapping = {}
         
         # Standard English column names
-        if 'channel' in columns_lower:
+        if 'station' in columns_lower:
+            mapping['program'] = columns_lower['station']
+        elif 'channel' in columns_lower:
             mapping['program'] = columns_lower['channel']
         elif 'program' in columns_lower:
             mapping['program'] = columns_lower['program']
@@ -292,8 +303,12 @@ def detect_data_format(df: pd.DataFrame) -> dict:
         elif 'time' in columns_lower:
             mapping['time'] = columns_lower['time']
         
-        if 'spend' in columns_lower:
+        if 'cost to client' in columns_lower:
+            mapping['cost'] = columns_lower['cost to client']
+        elif 'spend' in columns_lower:
             mapping['cost'] = columns_lower['spend']
+        elif 'gross' in columns_lower:
+            mapping['cost'] = columns_lower['gross']
         elif 'cost' in columns_lower:
             mapping['cost'] = columns_lower['cost']
         
@@ -752,17 +767,25 @@ async def analyze_spotlist(
 
     # 4. Prepare Response Data
     try:
-        # Verify required columns exist
-        required_cols = ["sendung_medium", "cost", "program", "date", "time", "sendung_long"]
+        # Verify required columns exist (sendung_medium and sendung_long are now optional)
+        required_cols = ["cost", "program", "date", "time"]
+        optional_cols = ["sendung_medium", "sendung_long"]
+
         missing_cols = [col for col in required_cols if col not in config.column_map]
         if missing_cols:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Missing required columns in detected format: {missing_cols}. Detected mapping: {config.column_map}"
             )
-        
-        creative_col = config.column_map["sendung_medium"]
-        df_annotated["creative_text_norm"] = df_annotated[creative_col].astype(str).str.lower()
+
+        # Handle creative column if available
+        creative_col = None
+        if "sendung_medium" in config.column_map:
+            creative_col = config.column_map["sendung_medium"]
+            df_annotated["creative_text_norm"] = df_annotated[creative_col].astype(str).str.lower()
+        else:
+            # No creative column - use a placeholder
+            df_annotated["creative_text_norm"] = "n/a"
         cost_col = config.column_map["cost"]
         program_col = config.column_map["program"]
         # Add numeric helper columns so the frontend doesn't have to guess column names

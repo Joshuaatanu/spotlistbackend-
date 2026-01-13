@@ -372,3 +372,4 @@ export default function TopTenReportView({ data, reportType }) {
         </div>
     );
 }
+

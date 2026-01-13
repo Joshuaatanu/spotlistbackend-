@@ -155,11 +155,15 @@ class SpotlistChecker:
         )
 
         # Normalised columns
-        df["creative_norm"] = (
-            df[cfg.column_map["sendung_medium"]]
-            .astype(str)
-            .str.lower()
-        )
+        if "sendung_medium" in cfg.column_map:
+            df["creative_norm"] = (
+                df[cfg.column_map["sendung_medium"]]
+                .astype(str)
+                .str.lower()
+            )
+        else:
+            df["creative_norm"] = "n/a"
+
         df["program_norm"] = (
             df[cfg.column_map["program"]]
             .astype(str)
@@ -168,9 +172,17 @@ class SpotlistChecker:
         # Preload lists for speed
         timestamps = df["timestamp"].tolist()
         program_vals = df["program_norm"].tolist()
-        creative_vals = df["creative_norm"].tolist()
-        sendungL_vals = df[cfg.column_map["sendung_long"]].astype(str).tolist()
-        sendungM_vals = df[cfg.column_map["sendung_medium"]].astype(str).tolist()
+        creative_vals = df["creative_norm"].tolist() if isinstance(df["creative_norm"].iloc[0] if len(df) > 0 else None, str) else ["n/a"] * len(df)
+
+        if "sendung_long" in cfg.column_map:
+            sendungL_vals = df[cfg.column_map["sendung_long"]].astype(str).tolist()
+        else:
+            sendungL_vals = ["n/a"] * len(df)
+
+        if "sendung_medium" in cfg.column_map:
+            sendungM_vals = df[cfg.column_map["sendung_medium"]].astype(str).tolist()
+        else:
+            sendungM_vals = ["n/a"] * len(df)
 
         n = len(df)
         double_indices: Set[int] = set()

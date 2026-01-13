@@ -136,3 +136,4 @@ export default function ReportTypeSelector({ reportType, setReportType }) {
     </div>
   );
 }
+

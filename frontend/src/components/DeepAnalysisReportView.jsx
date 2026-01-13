@@ -409,3 +409,4 @@ export default function DeepAnalysisReportView({ data, reportType }) {
         </div>
     );
 }
+

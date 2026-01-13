@@ -92,9 +92,9 @@ function App() {
     const requiresCompany = ['spotlist', 'competitor', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
     if ((requiresCompany && !companyName) || !dateFrom || !dateTo) return;
 
-    startLoading();
+    setCollectedData(null); // Clear any previously collected data (before startLoading!)
     setError(null);
-    setCollectedData(null); // Clear any previously collected data
+    startLoading();
     updateProgress({ percentage: 0, message: 'Starting data collection...', stage: 'info' });
 
     const formData = new FormData();

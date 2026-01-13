@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Filter, X, Settings2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
 import { getDisplayName } from '../utils/metadataEnricher';
@@ -304,9 +304,8 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                             });
 
                             return (
-                                <>
+                                <React.Fragment key={globalIndex}>
                                     <tr
-                                        key={globalIndex}
                                         className={cn(
                                             "cursor-pointer border-b hover:bg-muted/50 transition-colors",
                                             localIndex % 2 === 1 && "bg-muted/30"
@@ -404,7 +403,7 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
                                             </td>
                                         </tr>
                                     )}
-                                </>
+                                </React.Fragment>
                             );
                         })}
                     </tbody>

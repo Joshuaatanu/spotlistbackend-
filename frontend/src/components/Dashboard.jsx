@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
-import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye, Loader2, Calendar, Grid3X3, Sparkles, Target } from 'lucide-react';
+import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye, Loader2, Calendar, Grid3X3, Target, Film } from 'lucide-react';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import ExcelJS from 'exceljs';
 import MetricsCard from './MetricsCard';
@@ -15,11 +15,12 @@ const ReachFrequencyReportView = lazy(() => import('./ReachFrequencyReportView')
 const DeepAnalysisReportView = lazy(() => import('./DeepAnalysisReportView'));
 const DaypartAnalysisReportView = lazy(() => import('./DaypartAnalysisReportView'));
 const CompetitorComparison = lazy(() => import('./CompetitorComparison'));
-// Lazy load new analytics components
 const DoubleBookingsTimeline = lazy(() => import('./analytics/DoubleBookingsTimeline'));
 const DoubleBookingsHeatmap = lazy(() => import('./analytics/DoubleBookingsHeatmap'));
 const DoubleBookingsInsights = lazy(() => import('./analytics/DoubleBookingsInsights'));
 const CampaignPlanner = lazy(() => import('./analytics/CampaignPlanner'));
+const PositionAnalyzer = lazy(() => import('./analytics/PositionAnalyzer'));
+const CreativeAgeAnalyzer = lazy(() => import('./analytics/CreativeAgeAnalyzer'));
 import DashboardOverview from './DashboardOverview';
 import { enrichDataArray, initializeMetadata } from '../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ const VIEW_MODES = [
     { id: 'daypartAnalysis', label: 'Daypart', icon: Clock, description: 'Performance by time' },
     { id: 'topTen', label: 'Top Ten', icon: Trophy, description: 'Rankings analysis' },
     { id: 'deepAnalysis', label: 'KPIs', icon: Activity, description: 'Channel performance' },
+    { id: 'position', label: 'Position', icon: Target, description: 'Placement analysis' },
 ];
 
 export default function Dashboard({ data }) {
@@ -339,57 +341,47 @@ export default function Dashboard({ data }) {
     const hasXRP = displayMetrics?.total_xrp !== undefined;
     const hasReach = displayMetrics?.total_reach !== undefined;
 
-    // View Switcher Component
+    // View Switcher Component - Streamlined
     const ViewSwitcher = () => {
         if (!canSwitchViews) return null;
 
         return (
-            <Card className="mb-6">
-                <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Eye className="size-4 text-muted-foreground" />
-                            <CardTitle className="text-sm font-medium">View Mode</CardTitle>
-                        </div>
-                        {activeView && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setActiveView(null)}
-                                className="h-7 text-xs"
-                            >
-                                Reset to auto
-                            </Button>
-                        )}
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-wrap gap-2">
+            <div className="flex items-center justify-between py-4 border-b border-border">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-muted-foreground">View:</span>
+                    <div className="flex gap-1">
                         {VIEW_MODES.map(mode => {
                             const Icon = mode.icon;
                             const isActive = reportType === mode.id;
                             return (
                                 <Button
                                     key={mode.id}
-                                    variant={isActive ? 'default' : 'outline'}
+                                    variant={isActive ? 'default' : 'ghost'}
                                     size="sm"
                                     onClick={() => setActiveView(mode.id)}
                                     className={cn(
-                                        "h-9 px-3",
-                                        isActive && "bg-primary text-primary-foreground"
+                                        "h-8 px-3 text-xs",
+                                        !isActive && "text-muted-foreground hover:text-foreground"
                                     )}
                                 >
-                                    <Icon className="size-4 mr-1.5" />
+                                    <Icon className="size-3.5 mr-1.5" />
                                     {mode.label}
                                 </Button>
                             );
                         })}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                        {activeView ? 'Manually selected view' : `Auto-detected: ${detectedReportType}`}
-                    </p>
-                </CardContent>
-            </Card>
+                </div>
+                {activeView && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setActiveView(null)}
+                        className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                        Reset
+                    </Button>
+                )}
+            </div>
         );
     };
 
@@ -409,8 +401,8 @@ export default function Dashboard({ data }) {
                     return <ReachFrequencyReportView data={displayData || data} reportType={reportType} />;
                 case 'deepAnalysis':
                     return <DeepAnalysisReportView data={displayData} reportType={reportType} />;
-                case 'daypartAnalysis':
-                    return <DaypartAnalysisReportView data={displayData} fieldMap={fieldMap} />;
+                case 'position':
+                    return <PositionAnalyzer data={displayData} fieldMap={fieldMap} />;
                 default:
                     return null; // Spotlist view is handled separately below
             }
@@ -449,79 +441,72 @@ export default function Dashboard({ data }) {
             {/* AI Insights */}
             <AIInsights metrics={metrics} />
 
-            {/* Summary Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <MetricsCard
-                    title="Total Spend"
-                    value={`€${displayMetrics.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    icon={DollarSign}
-                />
-                <MetricsCard
-                    title="Double Booking Spend"
-                    value={`€${displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                    subValue={`${(displayMetrics.percent_cost * 100).toFixed(2)}% of total`}
-                    icon={AlertTriangle}
-                    isCritical={displayMetrics.double_cost > 0}
-                />
-                <MetricsCard
-                    title="Total Spots"
-                    value={displayMetrics.total_spots.toLocaleString()}
-                    icon={Layers}
-                />
-                <MetricsCard
-                    title="Double Spots"
-                    value={displayMetrics.double_spots.toLocaleString()}
-                    subValue={`${(displayMetrics.percent_spots * 100).toFixed(2)}% of spots`}
-                    icon={Activity}
-                    isCritical={displayMetrics.double_spots > 0}
-                />
-            </div>
+            {/* Summary Metrics - Two Row Layout */}
+            <div className="space-y-3">
+                {/* Primary Metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <MetricsCard
+                        title="Total Spend"
+                        value={`€${displayMetrics.total_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        icon={DollarSign}
+                    />
+                    <MetricsCard
+                        title="Double Booking Spend"
+                        value={`€${displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                        subValue={`${(displayMetrics.percent_cost * 100).toFixed(2)}% of total`}
+                        icon={AlertTriangle}
+                        isCritical={displayMetrics.double_cost > 0}
+                    />
+                    <MetricsCard
+                        title="Total Spots"
+                        value={displayMetrics.total_spots.toLocaleString()}
+                        icon={Layers}
+                    />
+                    <MetricsCard
+                        title="Double Spots"
+                        value={displayMetrics.double_spots.toLocaleString()}
+                        subValue={`${(displayMetrics.percent_spots * 100).toFixed(2)}% of spots`}
+                        icon={Activity}
+                        isCritical={displayMetrics.double_spots > 0}
+                    />
+                </div>
 
-            {/* Duplicate Breakdown */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>Duplicate Booking Analysis</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
-                        <div>
-                            <p className="text-sm font-semibold text-muted-foreground mb-2">Cost of Duplicates</p>
-                            <p className="text-2xl font-bold text-red-500">
-                                €{displayMetrics.double_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-semibold text-muted-foreground mb-2">Percentage of Budget</p>
-                            <p className="text-2xl font-bold text-red-500">
-                                {(displayMetrics.percent_cost * 100).toFixed(2)}%
-                            </p>
-                            <p className="text-xs text-muted-foreground">as % of costs</p>
-                        </div>
-                        <div>
-                            <p className="text-sm font-semibold text-muted-foreground mb-2">Affected Spots</p>
-                            <p className="text-2xl font-bold text-red-500">
-                                {displayMetrics.double_spots.toLocaleString()}
-                            </p>
-                        </div>
+                {/* Secondary Metrics - Breakdown by Programme Type */}
+                {(displayMetrics.same_sendung_spots !== undefined || displayMetrics.diff_sendung_spots !== undefined) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {displayMetrics.same_sendung_spots !== undefined && (
-                            <div>
-                                <p className="text-sm font-semibold text-muted-foreground mb-2">Same Programme</p>
-                                <p className="text-2xl font-bold text-amber-500">
-                                    {displayMetrics.same_sendung_spots.toLocaleString()}
-                                </p>
-                            </div>
+                            <Card className="border border-border bg-card">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="text-sm font-medium text-muted-foreground mb-1">Same Programme</div>
+                                            <div className="text-2xl font-semibold text-foreground tabular-nums">
+                                                {displayMetrics.same_sendung_spots.toLocaleString()}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground mt-1">Double bookings</div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         )}
                         {displayMetrics.diff_sendung_spots !== undefined && (
-                            <div>
-                                <p className="text-sm font-semibold text-muted-foreground mb-2">Different Programme</p>
-                                <p className="text-2xl font-bold text-red-500">
-                                    {displayMetrics.diff_sendung_spots.toLocaleString()}
-                                </p>
-                            </div>
+                            <Card className="border border-border bg-card">
+                                <CardContent className="p-4">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="text-sm font-medium text-muted-foreground mb-1">Different Programme</div>
+                                            <div className="text-2xl font-semibold text-destructive tabular-nums">
+                                                {displayMetrics.diff_sendung_spots.toLocaleString()}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground mt-1">Double bookings</div>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
                         )}
                     </div>
-                </CardContent>
-            </Card>
+                )}
+            </div>
 
             {/* Additional Metrics (XRP/Reach) */}
             {(hasXRP || hasReach) && (
