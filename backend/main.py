@@ -1292,8 +1292,9 @@ async def stream_progress_updates(
 
         # Default: Spotlist Report (existing logic)
         # 3. Fetch spotlists for each channel and filter by company
-        all_rows = []
-        
+        all_rows = []  # Filtered rows (matching company)
+        all_raw_rows = []  # All rows before company filtering (for debugging/fallback)
+
         # For competitor analysis, we fetch data for both companies
         target_companies = []
         if company_name:
@@ -1466,11 +1467,14 @@ async def stream_progress_updates(
                 # When using enhanced filtering with brand/product IDs, the API already filters by company
                 channel_matches = 0
                 for r in rows:
-                    # If using enhanced filtering with company_ids, brand_ids, or product_ids, 
+                    # Always add channel info and save to raw rows for fallback
+                    r["Channel"] = channel_caption
+                    all_raw_rows.append(r.copy())  # Save raw row before any filtering
+
+                    # If using enhanced filtering with company_ids, brand_ids, or product_ids,
                     # the API already filtered, so we don't need to filter again by company name
                     if brand_ids or product_ids or (dayparts or weekdays or epg_categories):
-                        # Enhanced filtering already applied - just add channel info
-                        r["Channel"] = channel_caption
+                        # Enhanced filtering already applied
                         all_rows.append(r)
                         channel_matches += 1
                     else:
@@ -1479,7 +1483,6 @@ async def stream_progress_updates(
                         company = str(r.get("Company") or r.get("Kunde") or "").lower()
                         matches_company = any(tc in company for tc in target_companies) if target_companies else (target in company if target else True)
                         if matches_company:
-                            r["Channel"] = channel_caption
                             all_rows.append(r)
                             channel_matches += 1
                 
@@ -1500,15 +1503,36 @@ async def stream_progress_updates(
                 continue
         
         yield send_progress(70, f"Found {len(all_rows)} total spots from {channels_with_data} channels", "success")
-        
+
+        # If no filtered rows but we have raw data, show the raw data instead
         if not all_rows:
-            yield send_progress(
-                70,
-                f"No ads found for company '{company_name}' in date range",
-                "error"
-            )
-            return
-        
+            if all_raw_rows:
+                # Get unique companies from raw data for helpful message
+                raw_companies = set()
+                for r in all_raw_rows[:100]:  # Sample first 100 rows
+                    company = str(r.get("Company") or r.get("Kunde") or "Unknown")
+                    if company and company != "Unknown":
+                        raw_companies.add(company)
+
+                yield send_progress(
+                    75,
+                    f"No exact match for '{company_name}'. Showing all {len(all_raw_rows)} collected spots instead.",
+                    "warning"
+                )
+
+                # Use raw data as fallback
+                all_rows = all_raw_rows
+                # Log available companies for debugging
+                if raw_companies:
+                    print(f"[DEBUG] Companies found in data: {list(raw_companies)[:20]}")
+            else:
+                yield send_progress(
+                    70,
+                    f"No ads found in date range {date_from} to {date_to}",
+                    "error"
+                )
+                return
+
         yield send_progress(75, "Converting to DataFrame...", "info")
         
         # 4. Convert to DataFrame
