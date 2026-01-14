@@ -37,6 +37,46 @@ CREATE TABLE IF NOT EXISTS configurations (
 CREATE INDEX IF NOT EXISTS idx_configurations_session_id ON configurations(session_id);
 
 -- ============================================================================
+-- Background Jobs Table
+-- Stores background data collection jobs with status and results
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS background_jobs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id TEXT NOT NULL,
+
+    -- Job identification
+    job_name TEXT NOT NULL,
+    job_type TEXT NOT NULL DEFAULT 'spotlist',
+
+    -- Status tracking
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending, queued, running, completed, failed
+    progress INTEGER DEFAULT 0,              -- 0-100
+    progress_message TEXT,
+
+    -- Job parameters (stored as JSON)
+    parameters JSONB NOT NULL DEFAULT '{}',
+
+    -- Results
+    result_data JSONB DEFAULT NULL,
+    result_metadata JSONB DEFAULT NULL,
+    error_message TEXT,
+
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+
+    -- Link to analysis (if user chose to analyze the collected data)
+    analysis_id UUID REFERENCES analyses(id) ON DELETE SET NULL
+);
+
+-- Indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_jobs_session_id ON background_jobs(session_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON background_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON background_jobs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_jobs_session_status ON background_jobs(session_id, status);
+
+-- ============================================================================
 -- Row Level Security (Optional but Recommended)
 -- Uncomment if you want to enforce session-based access at the database level
 -- ============================================================================

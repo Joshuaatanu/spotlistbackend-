@@ -64,12 +64,26 @@ except ImportError as e:
 try:
     from supabase_client import (
         save_analysis, get_analyses, get_analysis_by_id, delete_analysis,
-        save_configuration, get_configuration, check_database_connection
+        save_configuration, get_configuration, check_database_connection,
+        # Job-related functions
+        create_job as db_create_job,
+        get_jobs as db_get_jobs,
+        get_job_by_id as db_get_job_by_id,
+        delete_job as db_delete_job,
+        update_job_status as db_update_job_status,
     )
     SUPABASE_AVAILABLE = True
 except ImportError:
     print("Warning: Supabase client not available. Database features disabled.")
     SUPABASE_AVAILABLE = False
+
+# Import background jobs service
+try:
+    from services.jobs import job_manager, start_job
+    JOBS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Background jobs service not available: {e}")
+    JOBS_AVAILABLE = False
 
 # ============================================================================
 # Application Setup with Enhanced OpenAPI Documentation
@@ -491,9 +505,174 @@ async def get_saved_configuration(session_id: str):
     """Get saved configuration for a session."""
     if not SUPABASE_AVAILABLE:
         return None
-    
+
     config = get_configuration(session_id)
     return {"config": config}
+
+
+# ============================================================================
+# Background Jobs Endpoints
+# ============================================================================
+
+class JobCreateRequest(BaseModel):
+    """Request model for creating a background job."""
+    session_id: str
+    job_name: str
+    job_type: str = "spotlist"
+    parameters: dict
+
+
+@app.post("/jobs")
+async def create_job(request: JobCreateRequest, background_tasks: BackgroundTasks):
+    """
+    Create a new background data collection job.
+
+    The job will be queued and started automatically when capacity is available.
+    Maximum 3 concurrent jobs allowed.
+    """
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    if not JOBS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Background jobs service not available")
+
+    # Create job in database
+    try:
+        job = db_create_job(
+            session_id=request.session_id,
+            job_name=request.job_name,
+            job_type=request.job_type,
+            parameters=request.parameters
+        )
+    except Exception as e:
+        print(f"Error in db_create_job: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create job: {str(e)}")
+
+    if job is None:
+        raise HTTPException(status_code=500, detail="Failed to create job - database returned None")
+
+    job_id = job.get("id")
+
+    # Try to start job immediately (or queue it)
+    async def start_job_task():
+        await start_job(job_id, request.parameters)
+
+    background_tasks.add_task(start_job_task)
+
+    return {
+        **job,
+        "message": "Job created" if job_manager.can_start_job() else "Job queued (max concurrent jobs reached)"
+    }
+
+
+@app.get("/jobs")
+async def list_jobs(
+    session_id: str,
+    status: Optional[str] = None,
+    limit: int = 20,
+    offset: int = 0
+):
+    """Get background jobs for a session."""
+    if not SUPABASE_AVAILABLE:
+        return {"jobs": [], "running_count": 0, "pending_count": 0, "max_concurrent": 3}
+
+    jobs = db_get_jobs(session_id, status, limit, offset)
+
+    # Count by status
+    running_count = sum(1 for j in jobs if j.get("status") == "running")
+    pending_count = sum(1 for j in jobs if j.get("status") in ["pending", "queued"])
+
+    return {
+        "jobs": jobs,
+        "running_count": running_count,
+        "pending_count": pending_count,
+        "max_concurrent": 3
+    }
+
+
+@app.get("/jobs/status")
+async def get_job_manager_status():
+    """Get the current status of the job manager."""
+    if not JOBS_AVAILABLE:
+        return {"running_count": 0, "max_concurrent": 3, "can_start": True, "running_job_ids": []}
+    return job_manager.get_status()
+
+
+@app.get("/jobs/{job_id}")
+async def get_job(job_id: str, session_id: str):
+    """Get detailed information about a specific job."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    job = db_get_job_by_id(job_id, session_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    return job
+
+
+@app.delete("/jobs/{job_id}")
+async def delete_job(job_id: str, session_id: str):
+    """Cancel a running job or delete a completed/failed job."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    # Check if job is running and cancel it
+    if JOBS_AVAILABLE and job_manager.is_job_running(job_id):
+        await job_manager.cancel_job(job_id)
+        db_update_job_status(
+            job_id,
+            status="failed",
+            error_message="Cancelled by user",
+            completed_at=datetime.utcnow()
+        )
+        return {"deleted": True, "was_running": True}
+
+    # Delete from database
+    success = db_delete_job(job_id, session_id)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found or unauthorized")
+
+    return {"deleted": True, "was_running": False}
+
+
+@app.post("/jobs/{job_id}/retry")
+async def retry_job(job_id: str, session_id: str, background_tasks: BackgroundTasks):
+    """Retry a failed job."""
+    if not SUPABASE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Database not available")
+
+    if not JOBS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Background jobs service not available")
+
+    job = db_get_job_by_id(job_id, session_id)
+
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.get("status") != "failed":
+        raise HTTPException(status_code=400, detail="Only failed jobs can be retried")
+
+    # Reset job status
+    db_update_job_status(
+        job_id,
+        status="pending",
+        progress=0,
+        progress_message="Retrying...",
+        error_message=None
+    )
+
+    # Start the job
+    parameters = job.get("parameters", {})
+
+    async def start_job_task():
+        await start_job(job_id, parameters)
+
+    background_tasks.add_task(start_job_task)
+
+    return {"id": job_id, "status": "pending", "message": "Job retry scheduled"}
 
 
 # Metadata endpoints for enhanced filtering

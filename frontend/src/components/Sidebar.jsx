@@ -3,19 +3,26 @@ import {
     FileText,
     Clock,
     Settings,
-    LogOut
+    LogOut,
+    ListTodo,
+    Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useBackgroundJobs } from '../hooks/useBackgroundJobs';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
+    const { running, pending } = useBackgroundJobs();
+    const hasActiveJobs = running > 0 || pending > 0;
+
     const menuItems = [
         {
             category: 'MAIN',
             items: [
                 { id: 'analyze', label: 'Overview', icon: LayoutDashboard },
                 { id: 'results', label: 'Analysis Results', icon: FileText },
+                { id: 'jobs', label: 'Background Jobs', icon: ListTodo, badge: hasActiveJobs ? (running + pending) : null },
                 { id: 'history', label: 'History', icon: Clock },
             ]
         },
@@ -49,6 +56,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                             {section.items.map((item) => {
                                 const ItemIcon = item.icon;
                                 const isActive = activeTab === item.id;
+                                const isJobsWithRunning = item.id === 'jobs' && running > 0;
                                 return (
                                     <Button
                                         key={item.id}
@@ -59,8 +67,19 @@ export default function Sidebar({ activeTab, setActiveTab }) {
                                             isActive && "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
                                         )}
                                     >
-                                        <ItemIcon className="size-5" />
+                                        {isJobsWithRunning ? (
+                                            <Loader2 className="size-5 animate-spin text-primary" />
+                                        ) : (
+                                            <ItemIcon className="size-5" />
+                                        )}
                                         <span>{item.label}</span>
+
+                                        {/* Badge for active jobs */}
+                                        {item.badge && (
+                                            <span className="ml-auto flex items-center justify-center min-w-5 h-5 px-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-full">
+                                                {item.badge}
+                                            </span>
+                                        )}
 
                                         {isActive && (
                                             <div className="absolute -right-6 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary rounded-l" />

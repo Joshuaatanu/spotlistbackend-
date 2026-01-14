@@ -21,6 +21,8 @@ import { Toaster } from '@/components/ui/toaster';
 import { cn } from '@/lib/utils';
 import { useAnalysisHistory } from './hooks/useAnalysisHistory';
 import { useAnalysisStore } from './stores/analysisStore';
+import { useBackgroundJobs } from './hooks/useBackgroundJobs';
+import JobsPanel from './components/JobsPanel';
 
 function App() {
   // Get state and actions from Zustand store
@@ -50,6 +52,47 @@ function App() {
   } = useAnalysisStore();
 
   const { history, saveAnalysis, deleteAnalysis, dbAvailable } = useAnalysisHistory();
+
+  // Background jobs
+  const { queueJob, hasRunningJobs, running: runningJobsCount, fetchJobWithData } = useBackgroundJobs();
+
+  // Handler for queueing a background job
+  const handleQueueBackgroundJob = async () => {
+    const requiresCompany = ['spotlist', 'competitor', 'deepAnalysis', 'daypartAnalysis'].includes(reportType);
+    if ((requiresCompany && !companyName) || !dateFrom || !dateTo) return;
+
+    const jobName = companyName
+      ? `${companyName} (${dateFrom} to ${dateTo})`
+      : `All companies (${dateFrom} to ${dateTo})`;
+
+    const parameters = {
+      company_name: companyName || '',
+      competitor_company_name: competitorCompanyName || '',
+      date_from: dateFrom,
+      date_to: dateTo,
+      report_type: reportType === 'competitor' ? 'spotlist' : (reportType || 'spotlist'),
+      channel_filter: channelFilter || '',
+      brand_ids: brandIds,
+      product_ids: productIds,
+      weekdays: filters.weekdays,
+      dayparts: filters.dayparts,
+      epg_categories: filters.epgCategories,
+      profiles: filters.profiles,
+      ...config
+    };
+
+    try {
+      await queueJob({
+        job_name: jobName,
+        job_type: reportType || 'spotlist',
+        parameters
+      });
+      // Switch to jobs tab to show progress
+      setActiveTab('jobs');
+    } catch (error) {
+      setError(error.message || 'Failed to queue background job');
+    }
+  };
 
   const handleAnalyze = async () => {
     if (!file) return;
@@ -365,6 +408,7 @@ function App() {
                     ? (history.length > 0 && !showWizard ? 'Dashboard' : 'New Analysis')
                     : activeTab === 'results' ? 'Analysis Results'
                       : activeTab === 'history' ? 'Analysis History'
+                        : activeTab === 'jobs' ? 'Background Jobs'
                         : activeTab === 'configuration' ? 'Settings' : activeTab}
                 </h2>
               </div>
@@ -427,6 +471,7 @@ function App() {
                     collectedData={collectedData}
                     onAnalyzeCollectedData={handleAnalyzeCollectedData}
                     onDownloadRawData={handleDownloadRawData}
+                    onQueueBackgroundJob={handleQueueBackgroundJob}
                   />
                 )}
               </div>
@@ -491,6 +536,91 @@ function App() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Jobs Tab */}
+            {activeTab === 'jobs' && (
+              <div className="animate-in">
+                <JobsPanel
+                  onViewJobData={async (job) => {
+                    // Fetch full job data and download as CSV
+                    try {
+                      const fullJob = await fetchJobWithData(job.id);
+
+                      if (fullJob.result_data && fullJob.result_data.length > 0) {
+                        // Convert to CSV
+                        const data = fullJob.result_data;
+                        const headers = Object.keys(data[0]);
+                        const csvRows = [
+                          headers.join(','),
+                          ...data.map(row =>
+                            headers.map(h => {
+                              const val = row[h];
+                              // Escape quotes and wrap in quotes if contains comma
+                              if (val === null || val === undefined) return '';
+                              const str = String(val);
+                              if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                                return `"${str.replace(/"/g, '""')}"`;
+                              }
+                              return str;
+                            }).join(',')
+                          )
+                        ];
+                        const csvContent = csvRows.join('\n');
+
+                        // Download file
+                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = url;
+                        link.download = `${fullJob.job_name.replace(/[^a-z0-9]/gi, '_')}.csv`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                      } else if (fullJob.result_metadata?.data_too_large) {
+                        alert(`Data too large to download (${fullJob.result_metadata.data_size_mb}MB). The data was collected but not stored in the database due to size limits.`);
+                      } else {
+                        alert('No data available for this job.');
+                      }
+                    } catch (error) {
+                      console.error('Error fetching job data:', error);
+                    }
+                  }}
+                  onAnalyzeJob={async (job) => {
+                    // Fetch full job data including result_data
+                    try {
+                      const fullJob = await fetchJobWithData(job.id);
+
+                      if (!fullJob.result_data) {
+                        if (fullJob.result_metadata?.data_too_large) {
+                          alert(`Cannot analyze - data was too large to store (${fullJob.result_metadata.data_size_mb}MB).`);
+                        } else {
+                          alert('No data available for analysis.');
+                        }
+                        return;
+                      }
+
+                      // Set up the collected data and run analysis
+                      setCollectedData({
+                        raw_data: fullJob.result_data,
+                        metadata: {
+                          ...fullJob.result_metadata,
+                          total_spots: fullJob.result_data?.length || 0
+                        }
+                      });
+
+                      // Switch to analyze tab and trigger analysis
+                      setActiveTab('analyze');
+
+                      // Run the analysis
+                      await handleAnalyzeCollectedData();
+                    } catch (error) {
+                      console.error('Error analyzing job data:', error);
+                    }
+                  }}
+                />
               </div>
             )}
 

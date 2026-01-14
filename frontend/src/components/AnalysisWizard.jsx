@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Upload, Database, Settings, ChevronRight, ChevronLeft, Loader2, Check } from 'lucide-react';
+import { Upload, Database, Settings, ChevronRight, ChevronLeft, Loader2, Check, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -55,6 +55,7 @@ export default function AnalysisWizard({
     // Analysis handlers
     onAnalyze,
     onAnalyzeAeos,
+    onQueueBackgroundJob,
     // Status
     loading,
     error,
@@ -332,16 +333,31 @@ export default function AnalysisWizard({
                                 </Alert>
                             )}
 
-                            {/* Run Analysis Button */}
+                            {/* Run Analysis Buttons */}
                             {!loading && (
-                                <Button
-                                    onClick={handleRunAnalysis}
-                                    size="lg"
-                                    className="w-full"
-                                    disabled={!canProceedToStep3}
-                                >
-                                    🚀 Run Analysis
-                                </Button>
+                                <div className="flex gap-3">
+                                    <Button
+                                        onClick={handleRunAnalysis}
+                                        size="lg"
+                                        className="flex-1"
+                                        disabled={!canProceedToStep3}
+                                    >
+                                        🚀 Run Analysis
+                                    </Button>
+
+                                    {/* Run in Background - only for AEOS data source */}
+                                    {dataSource === 'aeos' && onQueueBackgroundJob && (
+                                        <Button
+                                            onClick={onQueueBackgroundJob}
+                                            size="lg"
+                                            variant="outline"
+                                            disabled={!canProceedToStep3}
+                                        >
+                                            <Clock className="size-4 mr-2" />
+                                            Run in Background
+                                        </Button>
+                                    )}
+                                </div>
                             )}
                         </CardContent>
                     </>
