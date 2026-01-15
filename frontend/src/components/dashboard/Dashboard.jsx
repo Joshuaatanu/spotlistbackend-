@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react';
 import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye, Loader2, Calendar, Grid3X3, Target, Film } from 'lucide-react';
 import { useDashboardStore } from '@/stores/dashboardStore';
+import { FEATURE_FLAGS } from '../../featureFlags';
 import ExcelJS from 'exceljs';
 import MetricsCard from '../metrics/MetricsCard';
 import { DoubleSpendChart, DoubleCountChart } from '../metrics/Charts';
@@ -528,8 +529,8 @@ export default function Dashboard({ data }) {
             {/* View Switcher */}
             <ViewSwitcher />
 
-            {/* AI Insights - disabled */}
-            {/* <AIInsights metrics={metrics} /> */}
+            {/* AI Insights */}
+            {FEATURE_FLAGS.aiInsights && <AIInsights metrics={metrics} />}
 
             {/* Summary Metrics - Two Row Layout */}
             <div className="space-y-3">
@@ -638,21 +639,23 @@ export default function Dashboard({ data }) {
                 </div>
             )}
 
-            {/* Trend Activity Chart - disabled */}
-            {/* <FullscreenChart title="Trend Activity">
-                <Card>
-                    <CardHeader className="flex-row items-center justify-between">
-                        <CardTitle className="flex items-center gap-2">
-                            Trend Activity
-                            {filteredData && <Badge variant="secondary" className="text-xs">Filtered</Badge>}
-                        </CardTitle>
-                        <span className="text-xs text-muted-foreground font-semibold">Last 30 Days</span>
-                    </CardHeader>
-                    <CardContent>
-                        <DoubleCountChart data={doubleBookings} programField={fieldMap?.program_column} />
-                    </CardContent>
-                </Card>
-            </FullscreenChart> */}
+            {/* Trend Activity Chart */}
+            {FEATURE_FLAGS.trendActivity && (
+                <FullscreenChart title="Trend Activity">
+                    <Card>
+                        <CardHeader className="flex-row items-center justify-between">
+                            <CardTitle className="flex items-center gap-2">
+                                Trend Activity
+                                {filteredData && <Badge variant="secondary" className="text-xs">Filtered</Badge>}
+                            </CardTitle>
+                            <span className="text-xs text-muted-foreground font-semibold">Last 30 Days</span>
+                        </CardHeader>
+                        <CardContent>
+                            <DoubleCountChart data={doubleBookings} programField={fieldMap?.program_column} />
+                        </CardContent>
+                    </Card>
+                </FullscreenChart>
+            )}
 
             {/* Advanced Filters */}
             <AdvancedFilters

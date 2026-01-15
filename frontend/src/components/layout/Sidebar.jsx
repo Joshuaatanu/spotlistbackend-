@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
+import { FEATURE_FLAGS } from '../../featureFlags';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
     const { running, pending } = useBackgroundJobs();
@@ -23,10 +24,10 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             items: [
                 { id: 'analyze', label: 'Overview', icon: LayoutDashboard },
                 { id: 'results', label: 'Analysis Results', icon: FileText },
-                { id: 'competitors', label: 'Competitor Analysis', icon: Users },
+                FEATURE_FLAGS.competitorAnalysis && { id: 'competitors', label: 'Competitor Analysis', icon: Users },
                 { id: 'jobs', label: 'Background Jobs', icon: ListTodo, badge: hasActiveJobs ? (running + pending) : null },
                 { id: 'history', label: 'History', icon: Clock },
-            ]
+            ].filter(Boolean)
         },
         {
             category: 'SYSTEM',
