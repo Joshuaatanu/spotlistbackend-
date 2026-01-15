@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Filter, Clock, Tv, Users, Calendar } from 'lucide-react';
 import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 
 export default function EnhancedFilters({ 
   filters, 

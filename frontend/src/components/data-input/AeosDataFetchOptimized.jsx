@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Database, Calendar, Building2, Info, AlertCircle, CheckCircle2, BarChart3 } from 'lucide-react';
-import ReportTypeSelector from './ReportTypeSelector';
-import EnhancedFilters from './EnhancedFilters';
-import CompanySelector from './CompanySelector';
-import BrandSelector from './BrandSelector';
-import ProductSelector from './ProductSelector';
+import ReportTypeSelector from '../selectors/ReportTypeSelector';
+import EnhancedFilters from '../filters/EnhancedFilters';
+import CompanySelector from '../selectors/CompanySelector';
+import BrandSelector from '../selectors/BrandSelector';
+import ProductSelector from '../selectors/ProductSelector';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

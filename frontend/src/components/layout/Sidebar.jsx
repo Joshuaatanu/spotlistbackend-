@@ -5,12 +5,13 @@ import {
     Settings,
     LogOut,
     ListTodo,
-    Loader2
+    Loader2,
+    Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { useBackgroundJobs } from '../hooks/useBackgroundJobs';
+import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 
 export default function Sidebar({ activeTab, setActiveTab }) {
     const { running, pending } = useBackgroundJobs();
@@ -22,6 +23,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             items: [
                 { id: 'analyze', label: 'Overview', icon: LayoutDashboard },
                 { id: 'results', label: 'Analysis Results', icon: FileText },
+                { id: 'competitors', label: 'Competitor Analysis', icon: Users },
                 { id: 'jobs', label: 'Background Jobs', icon: ListTodo, badge: hasActiveJobs ? (running + pending) : null },
                 { id: 'history', label: 'History', icon: Clock },
             ]

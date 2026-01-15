@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import FileUpload from './FileUpload';
 import AeosDataFetch from './AeosDataFetchOptimized';
 import ConfigPanel from './ConfigPanel';
-import ReportTypeSelector from './ReportTypeSelector';
+import ReportTypeSelector from '../selectors/ReportTypeSelector';
 
 const STEPS = [
     { id: 1, title: 'Select Data', description: 'Choose your data source' },

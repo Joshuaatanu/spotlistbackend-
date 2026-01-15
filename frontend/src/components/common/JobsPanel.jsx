@@ -19,7 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { useBackgroundJobs } from '../hooks/useBackgroundJobs';
+import { useBackgroundJobs } from '../../hooks/useBackgroundJobs';
 
 const STATUS_CONFIG = {
     pending: {

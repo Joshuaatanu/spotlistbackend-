@@ -2,37 +2,40 @@ import { useState, useMemo, useCallback, useEffect, lazy, Suspense } from 'react
 import { DollarSign, AlertTriangle, Layers, Activity, Download, Users, TrendingUp, BarChart3, Clock, Trophy, Eye, Loader2, Calendar, Grid3X3, Target, Film } from 'lucide-react';
 import { useDashboardStore } from '@/stores/dashboardStore';
 import ExcelJS from 'exceljs';
-import MetricsCard from './MetricsCard';
-import { DoubleSpendChart, DoubleCountChart } from './Charts';
-import WindowTable from './WindowTable';
-import DoubleBookingsTable from './DoubleBookingsTable';
-import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from './AdditionalMetrics';
-import AdvancedFilters from './AdvancedFilters';
-import AIInsights from './AIInsights';
+import MetricsCard from '../metrics/MetricsCard';
+import { DoubleSpendChart, DoubleCountChart } from '../metrics/Charts';
+import WindowTable from '../tables/WindowTable';
+import DoubleBookingsTable from '../tables/DoubleBookingsTable';
+import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from '../metrics/AdditionalMetrics';
+import AdvancedFilters from '../filters/AdvancedFilters';
+import AIInsights from '../common/AIInsights';
 // Lazy load heavy report view components for code splitting
-const TopTenReportView = lazy(() => import('./TopTenReportView'));
-const ReachFrequencyReportView = lazy(() => import('./ReachFrequencyReportView'));
-const DeepAnalysisReportView = lazy(() => import('./DeepAnalysisReportView'));
-const DaypartAnalysisReportView = lazy(() => import('./DaypartAnalysisReportView'));
-const CompetitorComparison = lazy(() => import('./CompetitorComparison'));
-const DoubleBookingsTimeline = lazy(() => import('./analytics/DoubleBookingsTimeline'));
-const DoubleBookingsHeatmap = lazy(() => import('./analytics/DoubleBookingsHeatmap'));
-const DoubleBookingsInsights = lazy(() => import('./analytics/DoubleBookingsInsights'));
-const CampaignPlanner = lazy(() => import('./analytics/CampaignPlanner'));
-const PositionAnalyzer = lazy(() => import('./analytics/PositionAnalyzer'));
-const CreativeAgeAnalyzer = lazy(() => import('./analytics/CreativeAgeAnalyzer'));
+const TopTenReportView = lazy(() => import('../reports/TopTenReportView'));
+const ReachFrequencyReportView = lazy(() => import('../reports/ReachFrequencyReportView'));
+const DeepAnalysisReportView = lazy(() => import('../reports/DeepAnalysisReportView'));
+const DaypartAnalysisReportView = lazy(() => import('../reports/DaypartAnalysisReportView'));
+const CompetitorComparison = lazy(() => import('../competitors/CompetitorComparison'));
+const DoubleBookingsTimeline = lazy(() => import('../analytics/DoubleBookingsTimeline'));
+const DoubleBookingsHeatmap = lazy(() => import('../analytics/DoubleBookingsHeatmap'));
+const DoubleBookingsInsights = lazy(() => import('../analytics/DoubleBookingsInsights'));
+const CampaignPlanner = lazy(() => import('../analytics/CampaignPlanner'));
+const PositionAnalyzer = lazy(() => import('../analytics/PositionAnalyzer'));
+const CreativeAgeAnalyzer = lazy(() => import('../analytics/CreativeAgeAnalyzer'));
+const CompetitorAnalysisView = lazy(() => import('../competitors/CompetitorAnalysisView'));
+const CompetitorSelector = lazy(() => import('../competitors/CompetitorSelector'));
 import DashboardOverview from './DashboardOverview';
-import { enrichDataArray, initializeMetadata } from '../utils/metadataEnricher';
+import { enrichDataArray, initializeMetadata } from '../../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
-import { DashboardSkeleton } from './DashboardSkeleton';
+import { DashboardSkeleton } from '../layout/DashboardSkeleton';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { KeyboardShortcutsHelp, KeyboardShortcutsButton } from './KeyboardShortcutsHelp';
-import { FullscreenChart } from './FullscreenChart';
+import { KeyboardShortcutsHelp, KeyboardShortcutsButton } from '../dialogs/KeyboardShortcutsHelp';
+import { FullscreenChart } from '../dialogs/FullscreenChart';
 import { useToast } from '@/hooks/useToast';
+import { API_BASE_URL } from '../../config';
 
 // Loading fallback for lazy loaded components
 const ReportViewLoading = () => (
@@ -113,6 +116,63 @@ export default function Dashboard({ data }) {
                 setEnrichmentLoading(false);
             });
     }, [rawData]);
+
+    // --- Competitor Analysis State ---
+    const [competitorAnalysisData, setCompetitorAnalysisData] = useState(null);
+    const [competitorLoading, setCompetitorLoading] = useState(false);
+    const [myCompanyId, setMyCompanyId] = useState('');
+    const [competitorIds, setCompetitorIds] = useState([]);
+
+    const handleRunCompetitorAnalysis = async () => {
+        setCompetitorLoading(true);
+        try {
+            // Default dates if filters not set (e.g., last 30 days or from data)
+            const today = new Date();
+            const last30 = new Date();
+            last30.setDate(today.getDate() - 30);
+
+            const startDate = filters?.dates?.start || last30.toISOString().split('T')[0];
+            const endDate = filters?.dates?.end || today.toISOString().split('T')[0];
+
+            // Clean valid IDs
+            const validCompetitors = competitorIds.filter(id => id);
+
+            const response = await fetch(`${API_BASE_URL}/api/competitors/analyze`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    my_company: myCompanyId,
+                    competitors: validCompetitors,
+                    start_date: startDate,
+                    end_date: endDate,
+                    channels: filters?.channels || null
+                })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Analysis failed');
+            }
+
+            const data = await response.json();
+            setCompetitorAnalysisData(data);
+            toast({
+                title: 'Analysis Complete',
+                description: 'Competitor data comparison is ready.',
+                variant: 'success',
+            });
+        } catch (err) {
+            console.error(err);
+            toast({
+                title: 'Analysis Failed',
+                description: err.message,
+                variant: 'destructive',
+            });
+        } finally {
+            setCompetitorLoading(false);
+        }
+    };
+
 
     const displayData = enrichedData || rawData;
 
@@ -394,7 +454,37 @@ export default function Dashboard({ data }) {
         const reportContent = (() => {
             switch (reportType) {
                 case 'competitor':
-                    return <CompetitorComparison data={displayData} fieldMap={fieldMap} />;
+                    if (competitorAnalysisData) {
+                        return (
+                            <div className="space-y-4">
+                                <div className="flex justify-end">
+                                    <Button variant="outline" size="sm" onClick={() => setCompetitorAnalysisData(null)}>
+                                        Back to Selection
+                                    </Button>
+                                </div>
+                                <CompetitorAnalysisView data={competitorAnalysisData} />
+                            </div>
+                        );
+                    }
+                    return (
+                        <div className="space-y-8">
+                            <CompetitorSelector
+                                myCompanyId={myCompanyId}
+                                setMyCompanyId={setMyCompanyId}
+                                competitorIds={competitorIds}
+                                setCompetitorIds={setCompetitorIds}
+                                onAnalyze={handleRunCompetitorAnalysis}
+                                loading={competitorLoading}
+                            />
+                            {/* Fallback to file-based comparison if available */}
+                            {displayData && displayData.length > 0 && (
+                                <div className="opacity-70 hover:opacity-100 transition-opacity">
+                                    <h3 className="text-lg font-semibold mb-2">File-based Brand Comparison</h3>
+                                    <CompetitorComparison data={displayData} fieldMap={fieldMap} />
+                                </div>
+                            )}
+                        </div>
+                    );
                 case 'topTen':
                     return <TopTenReportView data={displayData} reportType={reportType} />;
                 case 'reachFrequency':
@@ -438,8 +528,8 @@ export default function Dashboard({ data }) {
             {/* View Switcher */}
             <ViewSwitcher />
 
-            {/* AI Insights */}
-            <AIInsights metrics={metrics} />
+            {/* AI Insights - disabled */}
+            {/* <AIInsights metrics={metrics} /> */}
 
             {/* Summary Metrics - Two Row Layout */}
             <div className="space-y-3">
@@ -548,8 +638,8 @@ export default function Dashboard({ data }) {
                 </div>
             )}
 
-            {/* Trend Activity Chart */}
-            <FullscreenChart title="Trend Activity">
+            {/* Trend Activity Chart - disabled */}
+            {/* <FullscreenChart title="Trend Activity">
                 <Card>
                     <CardHeader className="flex-row items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
@@ -562,7 +652,7 @@ export default function Dashboard({ data }) {
                         <DoubleCountChart data={doubleBookings} programField={fieldMap?.program_column} />
                     </CardContent>
                 </Card>
-            </FullscreenChart>
+            </FullscreenChart> */}
 
             {/* Advanced Filters */}
             <AdvancedFilters

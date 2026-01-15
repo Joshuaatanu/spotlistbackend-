@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Filter, X, Settings2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDebounce } from 'use-debounce';
-import { getDisplayName } from '../utils/metadataEnricher';
+import { getDisplayName } from '../../utils/metadataEnricher';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';

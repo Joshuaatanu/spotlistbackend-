@@ -85,6 +85,15 @@ except ImportError as e:
     print(f"Warning: Background jobs service not available: {e}")
     JOBS_AVAILABLE = False
 
+# Import Competitor Service
+try:
+    from services.competitor_analyzer import CompetitorAnalyzer
+    COMPETITOR_SERVICE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: CompetitorAnalyzer service not available: {e}")
+    COMPETITOR_SERVICE_AVAILABLE = False
+
+
 # ============================================================================
 # Application Setup with Enhanced OpenAPI Documentation
 # ============================================================================
@@ -1471,8 +1480,10 @@ async def stream_progress_updates(
 
         # Default: Spotlist Report (existing logic)
         # 3. Fetch spotlists for each channel and filter by company
+        # Memory optimization: Use MAX_ROWS limit to prevent unbounded growth
+        MAX_ROWS = 50000
         all_rows = []  # Filtered rows (matching company)
-        all_raw_rows = []  # All rows before company filtering (for debugging/fallback)
+        row_limit_reached = False
 
         # For competitor analysis, we fetch data for both companies
         target_companies = []
@@ -1646,9 +1657,13 @@ async def stream_progress_updates(
                 # When using enhanced filtering with brand/product IDs, the API already filters by company
                 channel_matches = 0
                 for r in rows:
-                    # Always add channel info and save to raw rows for fallback
+                    # Check row limit to prevent memory exhaustion
+                    if len(all_rows) >= MAX_ROWS:
+                        row_limit_reached = True
+                        break
+                    
+                    # Always add channel info
                     r["Channel"] = channel_caption
-                    all_raw_rows.append(r.copy())  # Save raw row before any filtering
 
                     # If using enhanced filtering with company_ids, brand_ids, or product_ids,
                     # the API already filtered, so we don't need to filter again by company name
@@ -1672,6 +1687,15 @@ async def stream_progress_updates(
                         f"✓ Found {channel_matches} spots on {channel_caption}",
                         "success"
                     )
+                
+                # If row limit reached, stop processing more channels
+                if row_limit_reached:
+                    yield send_progress(
+                        int(progress),
+                        f"⚠ Row limit ({MAX_ROWS}) reached, stopping collection to prevent memory issues...",
+                        "warning"
+                    )
+                    break
                         
             except Exception as e:
                 yield send_progress(
@@ -1683,34 +1707,14 @@ async def stream_progress_updates(
         
         yield send_progress(70, f"Found {len(all_rows)} total spots from {channels_with_data} channels", "success")
 
-        # If no filtered rows but we have raw data, show the raw data instead
+        # Check if we have any data
         if not all_rows:
-            if all_raw_rows:
-                # Get unique companies from raw data for helpful message
-                raw_companies = set()
-                for r in all_raw_rows[:100]:  # Sample first 100 rows
-                    company = str(r.get("Company") or r.get("Kunde") or "Unknown")
-                    if company and company != "Unknown":
-                        raw_companies.add(company)
-
-                yield send_progress(
-                    75,
-                    f"No exact match for '{company_name}'. Showing all {len(all_raw_rows)} collected spots instead.",
-                    "warning"
-                )
-
-                # Use raw data as fallback
-                all_rows = all_raw_rows
-                # Log available companies for debugging
-                if raw_companies:
-                    print(f"[DEBUG] Companies found in data: {list(raw_companies)[:20]}")
-            else:
-                yield send_progress(
-                    70,
-                    f"No ads found in date range {date_from} to {date_to}",
-                    "error"
-                )
-                return
+            yield send_progress(
+                70,
+                f"No ads found for '{company_name}' in date range {date_from} to {date_to}",
+                "error"
+            )
+            return
 
         yield send_progress(75, "Converting to DataFrame...", "info")
         
@@ -1906,3 +1910,53 @@ async def generate_insights(request: InsightRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ============================================================================
+# Competitor Analysis Endpoints
+# ============================================================================
+
+class CompetitorAnalysisRequest(BaseModel):
+    my_company: str
+    competitors: List[str]
+    start_date: str
+    end_date: str
+    channels: Optional[List[str]] = None
+
+@app.post("/api/competitors/analyze")
+async def analyze_competitors(request: CompetitorAnalysisRequest):
+    """
+    Analyze competitor performance vs my company.
+    Fetches Spotlist Medium reports for all requested companies and returns
+    comparative metrics (SOV, Spend, Channel Mix, etc.).
+    """
+    if not AEOS_AVAILABLE:
+        raise HTTPException(status_code=503, detail="AEOS integration not available")
+    
+    if not COMPETITOR_SERVICE_AVAILABLE:
+        raise HTTPException(status_code=503, detail="Competitor service not available")
+
+    # Limit competitors
+    if len(request.competitors) > 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 competitors allowed")
+
+    try:
+        # Instantiate client and service (per request, or use dependency injection)
+        # Using sync client wrapper in service
+        client = AEOSClient() 
+        analyzer = CompetitorAnalyzer(client)
+        
+        result = await analyzer.analyze_competitors(
+            my_company_id=request.my_company,
+            competitor_ids=request.competitors,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            channels=request.channels
+        )
+        
+        return result
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+

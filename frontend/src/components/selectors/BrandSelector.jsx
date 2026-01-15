@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Tag, Search, X, Check } from 'lucide-react';
 import axios from 'axios';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../config';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';

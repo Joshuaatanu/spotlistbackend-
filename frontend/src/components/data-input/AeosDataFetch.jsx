@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { Database, Calendar, Building2 } from 'lucide-react';
-import ReportTypeSelector from './ReportTypeSelector';
-import EnhancedFilters from './EnhancedFilters';
-import CompanySelector from './CompanySelector';
+import ReportTypeSelector from '../selectors/ReportTypeSelector';
+import EnhancedFilters from '../filters/EnhancedFilters';
+import CompanySelector from '../selectors/CompanySelector';
 
 export default function AeosDataFetch({ 
   companyName, 

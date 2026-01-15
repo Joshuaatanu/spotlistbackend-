@@ -6,7 +6,7 @@ Stores final result in database on completion.
 """
 
 import asyncio
-import json
+import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable
 
@@ -18,6 +18,12 @@ from supabase_client import (
     get_running_jobs_count,
 )
 from .job_manager import job_manager
+
+# Configure logger
+logger = logging.getLogger(__name__)
+
+# Maximum rows to collect to prevent memory exhaustion
+MAX_ROWS = 50000
 
 
 async def update_progress(job_id: str, progress: int, message: str, stage: str = "info"):
@@ -59,7 +65,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         )
 
         await update_progress(job_id, 0, "Initializing AEOS client...", "info")
-        print(f"[JobExecutor] Job {job_id} - Initializing with params: {parameters}")
+        logger.info(f"Job {job_id} - Initializing")
 
         # Import AEOS components
         try:
@@ -67,10 +73,10 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
             from integration.spotlist_checker import SpotlistChecker
             from utils import flatten_spotlist_report
             AEOS_AVAILABLE = True
-            print(f"[JobExecutor] Job {job_id} - AEOS components imported successfully")
+            logger.debug(f"Job {job_id} - AEOS components imported")
         except ImportError as e:
             AEOS_AVAILABLE = False
-            print(f"[JobExecutor] Job {job_id} - AEOS import failed: {e}")
+            logger.error(f"Job {job_id} - AEOS import failed: {e}")
 
         if not AEOS_AVAILABLE:
             await loop.run_in_executor(
@@ -86,14 +92,14 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
 
         # Initialize AEOS client
         await update_progress(job_id, 5, "Connecting to AEOS...", "info")
-        print(f"[JobExecutor] Job {job_id} - Creating AEOS client...")
+        logger.debug(f"Job {job_id} - Creating AEOS client")
 
         try:
             client = await loop.run_in_executor(None, AEOSClient)
             checker = SpotlistChecker(client)
-            print(f"[JobExecutor] Job {job_id} - AEOS client created successfully")
+            logger.debug(f"Job {job_id} - AEOS client created")
         except Exception as e:
-            print(f"[JobExecutor] Job {job_id} - AEOS client error: {e}")
+            logger.error(f"Job {job_id} - AEOS client error: {e}")
             await loop.run_in_executor(
                 None,
                 lambda: update_job_status(
@@ -138,10 +144,10 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         total_channels = len(all_channels)
         await update_progress(job_id, 15, f"Processing {total_channels} channels...", "info")
 
-        # Collect data from channels
+        # Collect data from channels (with memory limit)
         all_rows = []
-        all_raw_rows = []
         channels_with_data = 0
+        row_limit_reached = False
         target = company_name.lower() if company_name else ""
 
         for idx, ch in enumerate(all_channels):
@@ -176,11 +182,15 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
                 if not rows:
                     continue
 
-                # Filter by company if specified
+                # Filter by company if specified (with row limit check)
                 channel_matches = 0
                 for r in rows:
+                    # Check row limit to prevent memory exhaustion
+                    if len(all_rows) >= MAX_ROWS:
+                        row_limit_reached = True
+                        break
+                    
                     r["Channel"] = channel_caption
-                    all_raw_rows.append(r.copy())
 
                     if target:
                         company = str(r.get("Company") or r.get("Kunde") or "").lower()
@@ -193,6 +203,16 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
 
                 if channel_matches > 0:
                     channels_with_data += 1
+                
+                # If row limit reached, stop processing more channels
+                if row_limit_reached:
+                    await update_progress(
+                        job_id,
+                        int(progress),
+                        f"Row limit ({MAX_ROWS}) reached, stopping collection...",
+                        "warning"
+                    )
+                    break
 
             except asyncio.TimeoutError:
                 await update_progress(
@@ -210,16 +230,6 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
                 )
 
         await update_progress(job_id, 70, f"Found {len(all_rows)} spots from {channels_with_data} channels", "success")
-
-        # Use raw data if no filtered matches
-        if not all_rows and all_raw_rows:
-            all_rows = all_raw_rows
-            await update_progress(
-                job_id,
-                75,
-                f"No exact match for '{company_name}'. Showing all {len(all_rows)} spots.",
-                "warning"
-            )
 
         if not all_rows:
             await loop.run_in_executor(
@@ -255,9 +265,9 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         )
 
         if success:
-            print(f"[JobExecutor] Job {job_id} completed with {len(all_rows)} spots")
+            logger.info(f"Job {job_id} completed with {len(all_rows)} spots")
         else:
-            print(f"[JobExecutor] Job {job_id} - Failed to save results to database")
+            logger.error(f"Job {job_id} - Failed to save results to database")
             await loop.run_in_executor(
                 None,
                 lambda: update_job_status(
@@ -283,8 +293,8 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
 
     except Exception as e:
         import traceback
-        print(f"[JobExecutor] Job {job_id} - Exception occurred: {e}")
-        traceback.print_exc()
+        logger.error(f"Job {job_id} - Exception occurred: {e}")
+        logger.exception("Full traceback:")
 
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
@@ -298,7 +308,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         )
 
     finally:
-        print(f"[JobExecutor] Job {job_id} - Cleaning up...")
+        logger.debug(f"Job {job_id} - Cleaning up")
         await job_manager.unregister_job(job_id)
         # Try to start next queued job
         await process_queued_jobs()
@@ -322,7 +332,7 @@ async def start_job(job_id: str, parameters: Dict[str, Any]) -> bool:
             None,
             lambda: update_job_status(job_id, status="queued")
         )
-        print(f"[JobExecutor] Job {job_id} queued (limit reached)")
+        logger.info(f"Job {job_id} queued (concurrency limit reached)")
         return False
 
     # Create and register task
@@ -339,7 +349,7 @@ async def start_job(job_id: str, parameters: Dict[str, Any]) -> bool:
         )
         return False
 
-    print(f"[JobExecutor] Started job {job_id}")
+    logger.info(f"Started job {job_id}")
     return True
 
 

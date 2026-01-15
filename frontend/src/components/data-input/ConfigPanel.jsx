@@ -1,11 +1,9 @@
 import { useMemo } from 'react';
 import { AlertTriangle, Info } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 
 // Time window risk configuration based on AGF approximation
 const TIME_WINDOW_RULES = {
@@ -67,13 +65,6 @@ export default function ConfigPanel({ config, setConfig }) {
         return getTimeWindowCategory(config.time_window_minutes);
     }, [config.time_window_minutes]);
 
-    const presetWindows = [
-        { label: '<30min', value: 25, category: 'veryHigh' },
-        { label: '30-60min', value: 45, category: 'high' },
-        { label: '60-90min', value: 75, category: 'medium' },
-        { label: '>90min', value: 105, category: 'low' }
-    ];
-
     return (
         <div className="flex flex-col gap-6">
             {/* Creative Match Mode - Always Exact Match */}
@@ -91,32 +82,6 @@ export default function ConfigPanel({ config, setConfig }) {
                     <Badge variant={timeWindowCategory.riskColor}>
                         {config.time_window_minutes} min
                     </Badge>
-                </div>
-
-                {/* Preset Buttons */}
-                <div className="grid grid-cols-4 gap-1 mb-4">
-                    {presetWindows.map(preset => {
-                        const presetCategory = TIME_WINDOW_RULES[preset.category];
-                        const isActive = config.time_window_minutes === preset.value;
-                        return (
-                            <Button
-                                key={preset.label}
-                                type="button"
-                                variant={isActive ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => handleChange('time_window_minutes', preset.value)}
-                                className={cn(
-                                    "text-xs",
-                                    isActive && presetCategory.riskColor === 'destructive' && "bg-red-500 hover:bg-red-600",
-                                    isActive && presetCategory.riskColor === 'warning' && "bg-amber-500 hover:bg-amber-600",
-                                    isActive && presetCategory.riskColor === 'info' && "bg-blue-500 hover:bg-blue-600",
-                                    isActive && presetCategory.riskColor === 'success' && "bg-emerald-500 hover:bg-emerald-600"
-                                )}
-                            >
-                                {preset.label}
-                            </Button>
-                        );
-                    })}
                 </div>
 
                 {/* Slider */}

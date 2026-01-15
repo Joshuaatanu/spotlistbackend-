@@ -2,15 +2,15 @@ import { useEffect } from 'react';
 import { Upload, Database, Settings, Clock, FileText, Download, Activity } from 'lucide-react';
 import axios from 'axios';
 import { API_BASE_URL } from './config';
-import FileUpload from './components/FileUpload';
-import AeosDataFetch from './components/AeosDataFetchOptimized';
-import ConfigPanel from './components/ConfigPanel';
-import Dashboard from './components/Dashboard';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import AnalysisWizard from './components/AnalysisWizard';
-import DashboardHome from './components/DashboardHome';
-import OnboardingTour from './components/OnboardingTour';
+import FileUpload from './components/data-input/FileUpload';
+import AeosDataFetch from './components/data-input/AeosDataFetchOptimized';
+import ConfigPanel from './components/data-input/ConfigPanel';
+import Dashboard from './components/dashboard/Dashboard';
+import Sidebar from './components/layout/Sidebar';
+import Header from './components/layout/Header';
+import AnalysisWizard from './components/data-input/AnalysisWizard';
+import DashboardHome from './components/dashboard/DashboardHome';
+import OnboardingTour from './components/common/OnboardingTour';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -22,7 +22,10 @@ import { cn } from '@/lib/utils';
 import { useAnalysisHistory } from './hooks/useAnalysisHistory';
 import { useAnalysisStore } from './stores/analysisStore';
 import { useBackgroundJobs } from './hooks/useBackgroundJobs';
-import JobsPanel from './components/JobsPanel';
+import JobsPanel from './components/common/JobsPanel';
+import CompetitorSelector from './components/competitors/CompetitorSelector';
+import CompetitorAnalysisView from './components/competitors/CompetitorAnalysisView';
+import CompetitorAnalysisPage from './components/competitors/CompetitorAnalysisPage';
 
 function App() {
   // Get state and actions from Zustand store
@@ -409,7 +412,8 @@ function App() {
                     : activeTab === 'results' ? 'Analysis Results'
                       : activeTab === 'history' ? 'Analysis History'
                         : activeTab === 'jobs' ? 'Background Jobs'
-                        : activeTab === 'configuration' ? 'Settings' : activeTab}
+                          : activeTab === 'competitors' ? 'Competitor Analysis'
+                            : activeTab === 'configuration' ? 'Settings' : activeTab}
                 </h2>
               </div>
               {(activeTab === 'analyze' || activeTab === 'results') && (
@@ -537,6 +541,11 @@ function App() {
                   </div>
                 )}
               </div>
+            )}
+
+            {/* Competitors Tab */}
+            {activeTab === 'competitors' && (
+              <CompetitorAnalysisPage />
             )}
 
             {/* Jobs Tab */}
