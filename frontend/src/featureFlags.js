@@ -19,7 +19,7 @@ export const FEATURE_FLAGS = {
 
   // UI Features
   keyboardShortcuts: true,
-  onboardingTour: true,
+  onboardingTour: false,
   advancedFilters: true,
 
   // Export Features
