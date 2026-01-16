@@ -9,18 +9,29 @@ const isDev = import.meta.env.DEV;
 
 export const FEATURE_FLAGS = {
   // Dashboard Features
-  aiInsights: false,
+  aiInsights: true,
+  aiSuggestions: true,
   trendActivity: false,
 
   // Analysis Features
-  competitorAnalysis: false,
+  competitorAnalysis: true,
   deepAnalysis: true,
   daypartAnalysis: true,
+  topTenAnalysis: true,
+  positionAnalysis: true,
+
+  // Analytics Features
+  doubleBookingsTimeline: true,
+  doubleBookingsHeatmap: true,
+  doubleBookingsInsights: true,
+  campaignPlanner: true,
+  creativeAgeAnalyzer: true,
 
   // UI Features
   keyboardShortcuts: true,
   onboardingTour: false,
   advancedFilters: true,
+  historyDelete: true,
 
   // Export Features
   excelExport: true,

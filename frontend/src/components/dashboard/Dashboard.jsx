@@ -10,6 +10,7 @@ import DoubleBookingsTable from '../tables/DoubleBookingsTable';
 import { DaypartAnalysis, ChannelPerformance, EPGCategoryBreakdown } from '../metrics/AdditionalMetrics';
 import AdvancedFilters from '../filters/AdvancedFilters';
 import AIInsights from '../common/AIInsights';
+import AISuggestions from '../common/AISuggestions';
 // Lazy load heavy report view components for code splitting
 const TopTenReportView = lazy(() => import('../reports/TopTenReportView'));
 const ReachFrequencyReportView = lazy(() => import('../reports/ReachFrequencyReportView'));
@@ -749,6 +750,9 @@ export default function Dashboard({ data }) {
                     <DoubleBookingsTable data={doubleBookings} fieldMap={fieldMap} />
                 </Card>
             </div>
+
+            {/* AI Suggestions */}
+            {FEATURE_FLAGS.aiSuggestions && <AISuggestions metrics={metrics} />}
 
             {/* Download Action */}
             <div className="flex justify-end">

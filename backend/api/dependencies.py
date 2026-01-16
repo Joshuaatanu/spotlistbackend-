@@ -58,9 +58,12 @@ except ImportError:
 # OpenAI availability flag
 OPENAI_AVAILABLE = False
 openai = None
+OPENAI_API_KEY = None
 try:
     import openai as _openai
+    import os
     openai = _openai
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     OPENAI_AVAILABLE = True
 except ImportError:
     print("Warning: OpenAI not available. AI insights disabled.")

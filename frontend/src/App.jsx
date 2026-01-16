@@ -433,6 +433,7 @@ function App() {
                     onSelectAnalysis={(analysis) => {
                       handleSelectHistory(analysis);
                     }}
+                    onDeleteAnalysis={deleteAnalysis}
                   />
                 ) : (
                   /* Show Wizard for new analysis */

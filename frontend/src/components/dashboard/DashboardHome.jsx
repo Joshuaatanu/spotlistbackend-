@@ -1,25 +1,23 @@
 import { useMemo, useCallback } from 'react';
 import {
-    Activity,
     FileText,
-    TrendingUp,
     Clock,
     ChevronRight,
     Plus,
-    BarChart3,
-    AlertTriangle,
-    Download
+    Download,
+    Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import { FEATURE_FLAGS } from '../../featureFlags';
 
 export default function DashboardHome({
     history,
     onStartNewAnalysis,
     onViewHistory,
-    onSelectAnalysis
+    onSelectAnalysis,
+    onDeleteAnalysis
 }) {
     // Calculate aggregate stats from history
     const stats = useMemo(() => {
@@ -131,69 +129,6 @@ export default function DashboardHome({
                 </div>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-tour="dashboard-stats">
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground mb-1">Total Analyses</p>
-                                <p className="text-3xl font-bold">{stats.totalAnalyses}</p>
-                            </div>
-                            <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
-                                <Activity className="size-6 text-primary" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground mb-1">Spots Analyzed</p>
-                                <p className="text-3xl font-bold">{stats.totalSpots.toLocaleString()}</p>
-                            </div>
-                            <div className="size-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                <BarChart3 className="size-6 text-blue-500" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground mb-1">Double Bookings</p>
-                                <p className="text-3xl font-bold text-amber-500">
-                                    {stats.totalDoubleBookings.toLocaleString()}
-                                </p>
-                            </div>
-                            <div className="size-12 rounded-full bg-amber-500/10 flex items-center justify-center">
-                                <AlertTriangle className="size-6 text-amber-500" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-muted-foreground mb-1">Avg. Double Rate</p>
-                                <p className="text-3xl font-bold">
-                                    {stats.avgDoubleRate}%
-                                </p>
-                            </div>
-                            <div className="size-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
-                                <TrendingUp className="size-6 text-emerald-500" />
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-
             {/* Recent Activity */}
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -227,10 +162,17 @@ export default function DashboardHome({
                                     ? ((analysis.metrics.double_spots / analysis.metrics.total_spots) * 100).toFixed(1)
                                     : 0;
 
+                                const handleDelete = (e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Are you sure you want to delete this analysis?')) {
+                                        onDeleteAnalysis(analysis.id || analysis.dbId);
+                                    }
+                                };
+
                                 return (
                                     <div
                                         key={analysis.id || index}
-                                        className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
+                                        className="flex items-center gap-4 p-4 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors group"
                                         onClick={() => onSelectAnalysis(analysis)}
                                     >
                                         <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -258,6 +200,16 @@ export default function DashboardHome({
                                             >
                                                 {doubleRate}%
                                             </Badge>
+                                            {FEATURE_FLAGS.historyDelete && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="size-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                                                    onClick={handleDelete}
+                                                >
+                                                    <Trash2 className="size-4" />
+                                                </Button>
+                                            )}
                                             <ChevronRight className="size-4 text-muted-foreground" />
                                         </div>
                                     </div>

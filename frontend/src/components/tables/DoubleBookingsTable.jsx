@@ -63,25 +63,22 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
         setVisibleColumns(prev => ({ ...prev, [column]: !prev[column] }));
     };
 
-    if (!data || data.length === 0) {
-        return (
-            <div className="p-6 text-center text-muted-foreground">
-                No double bookings found.
-            </div>
-        );
-    }
-
-    const channels = [...new Set(data.map(item => {
-        return getDisplayName(item, 'channel') ||
-            item[fieldMap?.program_column] ||
-            item.program_original ||
-            item.program_norm ||
-            item.channel_display ||
-            'Unknown';
-    }))].sort();
+    // Calculate channels list (handle empty data)
+    const channels = useMemo(() => {
+        if (!data || data.length === 0) return [];
+        return [...new Set(data.map(item => {
+            return getDisplayName(item, 'channel') ||
+                item[fieldMap?.program_column] ||
+                item.program_original ||
+                item.program_norm ||
+                item.channel_display ||
+                'Unknown';
+        }))].sort();
+    }, [data, fieldMap]);
 
     // Memoize filtered and sorted data for performance
     const filteredData = useMemo(() => {
+        if (!data || data.length === 0) return [];
         let result = data.filter(item => {
             const channel = getDisplayName(item, 'channel') ||
                 item[fieldMap?.program_column] ||
@@ -176,6 +173,15 @@ export default function DoubleBookingsTable({ data, fieldMap }) {
     };
 
     const getCreative = (item) => item[fieldMap?.creative_column] || item.Claim || item.creative_norm || 'N/A';
+
+    // Early return for empty data (after all hooks)
+    if (!data || data.length === 0) {
+        return (
+            <div className="p-6 text-center text-muted-foreground">
+                No double bookings found.
+            </div>
+        );
+    }
 
     return (
         <div>

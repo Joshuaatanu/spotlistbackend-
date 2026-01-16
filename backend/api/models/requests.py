@@ -24,4 +24,3 @@ class ConfigurationSaveRequest(BaseModel):
 class InsightRequest(BaseModel):
     """Request model for generating AI insights."""
     metrics: dict[str, Any] = Field(..., description="Analysis metrics to generate insights for")
-    apiKey: str = Field(..., description="OpenAI API key")
