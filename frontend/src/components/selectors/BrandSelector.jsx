@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 
 export default function BrandSelector({
     companyId,
-    brandIds,
+    brandIds = [],
     setBrandIds,
     disabled = false
 }) {
@@ -18,6 +18,9 @@ export default function BrandSelector({
     const [searchQuery, setSearchQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const [error, setError] = useState(null);
+
+    // Ensure brandIds is always an array
+    const safeBrandIds = Array.isArray(brandIds) ? brandIds : [];
 
     useEffect(() => {
         if (!companyId) {
@@ -67,21 +70,25 @@ export default function BrandSelector({
         if (!brandId) return;
 
         setBrandIds(prev => {
-            if (prev.includes(brandId)) {
-                return prev.filter(id => id !== brandId);
+            const prevArray = Array.isArray(prev) ? prev : [];
+            if (prevArray.includes(brandId)) {
+                return prevArray.filter(id => id !== brandId);
             } else {
-                return [...prev, brandId];
+                return [...prevArray, brandId];
             }
         });
     };
 
     const handleRemoveBrand = (brandId) => {
-        setBrandIds(prev => prev.filter(id => id !== brandId));
+        setBrandIds(prev => {
+            const prevArray = Array.isArray(prev) ? prev : [];
+            return prevArray.filter(id => id !== brandId);
+        });
     };
 
     const selectedBrands = useMemo(() => {
-        return brands.filter(b => brandIds.includes(b.value || b.id));
-    }, [brands, brandIds]);
+        return brands.filter(b => safeBrandIds.includes(b.value || b.id));
+    }, [brands, safeBrandIds]);
 
     return (
         <div className="relative">
@@ -154,7 +161,7 @@ export default function BrandSelector({
                                     filteredBrands.map(brand => {
                                         const brandId = brand.value || brand.id;
                                         const name = brand.caption || brand.name || brand.label || 'Unknown';
-                                        const isSelected = brandIds.includes(brandId);
+                                        const isSelected = safeBrandIds.includes(brandId);
                                         return (
                                             <div
                                                 key={brandId}

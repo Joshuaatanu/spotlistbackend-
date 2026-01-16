@@ -561,6 +561,102 @@ def get_running_jobs_count() -> int:
         return 0
 
 
+def get_stale_running_jobs() -> List[Dict]:
+    """
+    Get jobs that are marked as 'running' in the database.
+
+    These are likely stale jobs from a previous server instance that crashed
+    or restarted before completing them.
+
+    Returns:
+        List of job records with status='running'
+    """
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        result = (
+            client.table("background_jobs")
+            .select("*")
+            .eq("status", "running")
+            .execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"Error fetching stale running jobs: {e}")
+        return []
+
+
+def increment_job_retry(job_id: str) -> bool:
+    """
+    Increment the retry count for a job.
+
+    Args:
+        job_id: The job UUID
+
+    Returns:
+        True if successful, False otherwise
+    """
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    try:
+        # Get current retry count
+        result = client.table("background_jobs").select("retry_count").eq("id", job_id).execute()
+        if not result.data:
+            return False
+
+        current_count = result.data[0].get("retry_count", 0) or 0
+
+        # Increment retry count
+        client.table("background_jobs").update({
+            "retry_count": current_count + 1
+        }).eq("id", job_id).execute()
+
+        return True
+    except Exception as e:
+        print(f"Error incrementing retry count for job {job_id}: {e}")
+        return False
+
+
+def mark_stale_jobs_as_failed(job_ids: List[str], error_message: str = "Server restarted") -> int:
+    """
+    Mark multiple jobs as failed due to server restart.
+
+    Args:
+        job_ids: List of job UUIDs to mark as failed
+        error_message: Error message to set
+
+    Returns:
+        Number of jobs updated
+    """
+    if not job_ids:
+        return 0
+
+    client = get_supabase_client()
+    if not client:
+        return 0
+
+    try:
+        from datetime import datetime
+        result = (
+            client.table("background_jobs")
+            .update({
+                "status": "failed",
+                "error_message": error_message,
+                "completed_at": datetime.utcnow().isoformat()
+            })
+            .in_("id", job_ids)
+            .execute()
+        )
+        return len(result.data) if result.data else 0
+    except Exception as e:
+        print(f"Error marking stale jobs as failed: {e}")
+        return 0
+
+
 # ============================================================================
 # Database Health Check
 # ============================================================================

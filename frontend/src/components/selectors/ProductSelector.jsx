@@ -8,9 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 export default function ProductSelector({
-    brandIds,
+    brandIds = [],
     companyId,
-    productIds,
+    productIds = [],
     setProductIds,
     disabled = false
 }) {
@@ -20,8 +20,12 @@ export default function ProductSelector({
     const [isOpen, setIsOpen] = useState(false);
     const [error, setError] = useState(null);
 
+    // Ensure arrays are always arrays
+    const safeBrandIds = Array.isArray(brandIds) ? brandIds : [];
+    const safeProductIds = Array.isArray(productIds) ? productIds : [];
+
     useEffect(() => {
-        const shouldFetch = (brandIds && brandIds.length > 0) || companyId;
+        const shouldFetch = (safeBrandIds.length > 0) || companyId;
 
         if (!shouldFetch) {
             setProducts([]);
@@ -35,8 +39,8 @@ export default function ProductSelector({
             try {
                 const params = { filter_text: searchQuery };
 
-                if (brandIds && brandIds.length > 0) {
-                    params.brand_ids = brandIds.join(',');
+                if (safeBrandIds.length > 0) {
+                    params.brand_ids = safeBrandIds.join(',');
                 } else if (companyId) {
                     params.company_id = companyId;
                 }
@@ -60,7 +64,7 @@ export default function ProductSelector({
         };
 
         fetchProducts();
-    }, [brandIds, companyId, searchQuery]);
+    }, [safeBrandIds.join(','), companyId, searchQuery]);
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery.trim()) {
@@ -78,29 +82,33 @@ export default function ProductSelector({
         if (!productId) return;
 
         setProductIds(prev => {
-            if (prev.includes(productId)) {
-                return prev.filter(id => id !== productId);
+            const prevArray = Array.isArray(prev) ? prev : [];
+            if (prevArray.includes(productId)) {
+                return prevArray.filter(id => id !== productId);
             } else {
-                return [...prev, productId];
+                return [...prevArray, productId];
             }
         });
     };
 
     const handleRemoveProduct = (productId) => {
-        setProductIds(prev => prev.filter(id => id !== productId));
+        setProductIds(prev => {
+            const prevArray = Array.isArray(prev) ? prev : [];
+            return prevArray.filter(id => id !== productId);
+        });
     };
 
     const selectedProducts = useMemo(() => {
-        return products.filter(p => productIds.includes(p.value || p.id));
-    }, [products, productIds]);
+        return products.filter(p => safeProductIds.includes(p.value || p.id));
+    }, [products, safeProductIds]);
 
-    const canFetch = (brandIds && brandIds.length > 0) || companyId;
+    const canFetch = (safeBrandIds.length > 0) || companyId;
 
     return (
         <div className="relative">
             <Label className="flex items-center gap-2 mb-2">
                 <Package className="size-4" />
-                Products {brandIds && brandIds.length > 0 ? '(filtered by selected brands)' : companyId ? '(all products for company)' : '(Select company or brands first)'}
+                Products {safeBrandIds.length > 0 ? '(filtered by selected brands)' : companyId ? '(all products for company)' : '(Select company or brands first)'}
             </Label>
 
             {!canFetch && (
@@ -167,7 +175,7 @@ export default function ProductSelector({
                                     filteredProducts.map(product => {
                                         const productId = product.value || product.id;
                                         const name = product.caption || product.name || product.label || 'Unknown';
-                                        const isSelected = productIds.includes(productId);
+                                        const isSelected = safeProductIds.includes(productId);
                                         return (
                                             <div
                                                 key={productId}

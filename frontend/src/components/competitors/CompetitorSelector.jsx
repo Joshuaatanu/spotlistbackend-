@@ -118,7 +118,7 @@ function SingleCompetitorSelect({
 export default function CompetitorSelector({
     myCompanyId,
     setMyCompanyId,
-    competitorIds,
+    competitorIds = [],
     setCompetitorIds,
     dateRange,
     setDateRange,
@@ -127,6 +127,9 @@ export default function CompetitorSelector({
 }) {
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(false);
+
+    // Ensure competitorIds is always an array
+    const safeCompetitorIds = Array.isArray(competitorIds) ? competitorIds : [];
 
     // Competitor colors (matching requirements)
     const COLORS = ['#F97316', '#22C55E', '#A855F7', '#EC4899', '#06B6D4'];
@@ -161,19 +164,19 @@ export default function CompetitorSelector({
     // Let's implement a clean "My Company" select here using the fetched list.
 
     const handleAddCompetitor = () => {
-        if (competitorIds.length < MAX_COMPETITORS) {
-            setCompetitorIds([...competitorIds, null]);
+        if (safeCompetitorIds.length < MAX_COMPETITORS) {
+            setCompetitorIds([...safeCompetitorIds, null]);
         }
     };
 
     const handleUpdateCompetitor = (index, newId) => {
-        const newIds = [...competitorIds];
+        const newIds = [...safeCompetitorIds];
         newIds[index] = newId;
         setCompetitorIds(newIds);
     };
 
     const handleRemoveCompetitor = (index) => {
-        const newIds = competitorIds.filter((_, i) => i !== index);
+        const newIds = safeCompetitorIds.filter((_, i) => i !== index);
         setCompetitorIds(newIds);
     };
 
@@ -278,8 +281,8 @@ export default function CompetitorSelector({
             {/* Competitors List */}
             <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                    <Label>Competitors ({competitorIds.length}/{MAX_COMPETITORS})</Label>
-                    {competitorIds.length < MAX_COMPETITORS && (
+                    <Label>Competitors ({safeCompetitorIds.length}/{MAX_COMPETITORS})</Label>
+                    {safeCompetitorIds.length < MAX_COMPETITORS && (
                         <Button
                             variant="outline"
                             size="sm"
@@ -292,7 +295,7 @@ export default function CompetitorSelector({
                 </div>
 
                 <div className="space-y-2">
-                    {competitorIds.map((id, idx) => (
+                    {safeCompetitorIds.map((id, idx) => (
                         <SingleCompetitorSelect
                             key={idx}
                             index={idx}
@@ -304,7 +307,7 @@ export default function CompetitorSelector({
                         />
                     ))}
 
-                    {competitorIds.length === 0 && (
+                    {safeCompetitorIds.length === 0 && (
                         <p className="text-xs text-muted-foreground italic pl-5">
                             No competitors added. Comparisons will be against market totals only.
                         </p>

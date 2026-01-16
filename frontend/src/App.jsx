@@ -11,6 +11,7 @@ import Header from './components/layout/Header';
 import AnalysisWizard from './components/data-input/AnalysisWizard';
 import DashboardHome from './components/dashboard/DashboardHome';
 import OnboardingTour from './components/common/OnboardingTour';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -423,70 +424,74 @@ function App() {
 
             {/* Content */}
             {activeTab === 'analyze' && (
-              <div>
-                {/* Show Dashboard if user has history and not in wizard mode */}
-                {history.length > 0 && !showWizard ? (
-                  <DashboardHome
-                    history={history}
-                    onStartNewAnalysis={() => setShowWizard(true)}
-                    onViewHistory={() => setActiveTab('history')}
-                    onSelectAnalysis={(analysis) => {
-                      handleSelectHistory(analysis);
-                    }}
-                    onDeleteAnalysis={deleteAnalysis}
-                  />
-                ) : (
-                  /* Show Wizard for new analysis */
-                  <AnalysisWizard
-                    dataSource={dataSource}
-                    setDataSource={setDataSource}
-                    file={file}
-                    setFile={setFile}
-                    companyName={companyName}
-                    setCompanyName={setCompanyName}
-                    companyId={companyId}
-                    setCompanyId={setCompanyId}
-                    competitorCompanyName={competitorCompanyName}
-                    setCompetitorCompanyName={setCompetitorCompanyName}
-                    competitorCompanyId={competitorCompanyId}
-                    setCompetitorCompanyId={setCompetitorCompanyId}
-                    brandIds={brandIds}
-                    setBrandIds={setBrandIds}
-                    productIds={productIds}
-                    setProductIds={setProductIds}
-                    dateFrom={dateFrom}
-                    setDateFrom={setDateFrom}
-                    dateTo={dateTo}
-                    setDateTo={setDateTo}
-                    channelFilter={channelFilter}
-                    setChannelFilter={setChannelFilter}
-                    reportType={reportType}
-                    setReportType={setReportType}
-                    filters={filters}
-                    setFilters={setFilters}
-                    topTenSubtype={topTenSubtype}
-                    setTopTenSubtype={setTopTenSubtype}
-                    config={config}
-                    setConfig={setConfig}
-                    onAnalyze={handleAnalyze}
-                    onAnalyzeAeos={handleAnalyzeAeos}
-                    loading={loading}
-                    error={error}
-                    progress={progress}
-                    collectedData={collectedData}
-                    onAnalyzeCollectedData={handleAnalyzeCollectedData}
-                    onDownloadRawData={handleDownloadRawData}
-                    onQueueBackgroundJob={handleQueueBackgroundJob}
-                  />
-                )}
-              </div>
+              <ErrorBoundary section="the Dashboard">
+                <div>
+                  {/* Show Dashboard if user has history and not in wizard mode */}
+                  {history.length > 0 && !showWizard ? (
+                    <DashboardHome
+                      history={history}
+                      onStartNewAnalysis={() => setShowWizard(true)}
+                      onViewHistory={() => setActiveTab('history')}
+                      onSelectAnalysis={(analysis) => {
+                        handleSelectHistory(analysis);
+                      }}
+                      onDeleteAnalysis={deleteAnalysis}
+                    />
+                  ) : (
+                    /* Show Wizard for new analysis */
+                    <AnalysisWizard
+                      dataSource={dataSource}
+                      setDataSource={setDataSource}
+                      file={file}
+                      setFile={setFile}
+                      companyName={companyName}
+                      setCompanyName={setCompanyName}
+                      companyId={companyId}
+                      setCompanyId={setCompanyId}
+                      competitorCompanyName={competitorCompanyName}
+                      setCompetitorCompanyName={setCompetitorCompanyName}
+                      competitorCompanyId={competitorCompanyId}
+                      setCompetitorCompanyId={setCompetitorCompanyId}
+                      brandIds={brandIds}
+                      setBrandIds={setBrandIds}
+                      productIds={productIds}
+                      setProductIds={setProductIds}
+                      dateFrom={dateFrom}
+                      setDateFrom={setDateFrom}
+                      dateTo={dateTo}
+                      setDateTo={setDateTo}
+                      channelFilter={channelFilter}
+                      setChannelFilter={setChannelFilter}
+                      reportType={reportType}
+                      setReportType={setReportType}
+                      filters={filters}
+                      setFilters={setFilters}
+                      topTenSubtype={topTenSubtype}
+                      setTopTenSubtype={setTopTenSubtype}
+                      config={config}
+                      setConfig={setConfig}
+                      onAnalyze={handleAnalyze}
+                      onAnalyzeAeos={handleAnalyzeAeos}
+                      loading={loading}
+                      error={error}
+                      progress={progress}
+                      collectedData={collectedData}
+                      onAnalyzeCollectedData={handleAnalyzeCollectedData}
+                      onDownloadRawData={handleDownloadRawData}
+                      onQueueBackgroundJob={handleQueueBackgroundJob}
+                    />
+                  )}
+                </div>
+              </ErrorBoundary>
             )}
 
             {/* Results Tab */}
             {activeTab === 'results' && results && (
-              <div className="animate-in">
-                <Dashboard data={results} />
-              </div>
+              <ErrorBoundary section="the Analysis Results">
+                <div className="animate-in">
+                  <Dashboard data={results} />
+                </div>
+              </ErrorBoundary>
             )}
 
             {/* History Tab */}
@@ -546,7 +551,9 @@ function App() {
 
             {/* Competitors Tab */}
             {activeTab === 'competitors' && (
-              <CompetitorAnalysisPage />
+              <ErrorBoundary section="the Competitor Analysis">
+                <CompetitorAnalysisPage />
+              </ErrorBoundary>
             )}
 
             {/* Jobs Tab */}

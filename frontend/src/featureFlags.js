@@ -9,12 +9,12 @@ const isDev = import.meta.env.DEV;
 
 export const FEATURE_FLAGS = {
   // Dashboard Features
-  aiInsights: true,
+  aiInsights: false,
   aiSuggestions: true,
   trendActivity: false,
 
   // Analysis Features
-  competitorAnalysis: true,
+  competitorAnalysis: false,
   deepAnalysis: true,
   daypartAnalysis: true,
   topTenAnalysis: true,

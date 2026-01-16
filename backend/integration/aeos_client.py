@@ -1,11 +1,34 @@
 import os
+import sys
 import socket
 import requests
+import logging
 from datetime import datetime, timedelta
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 from pathlib import Path
+
+# Add parent directory to path for api imports
+_parent_path = str(Path(__file__).parent.parent)
+if _parent_path not in sys.path:
+    sys.path.insert(0, _parent_path)
+
+# Import resilience utilities
+try:
+    from api.resilience import (
+        create_retry_decorator,
+        aeos_circuit_breaker,
+        CircuitBreakerError,
+        TENACITY_AVAILABLE,
+        CIRCUITBREAKER_AVAILABLE,
+    )
+    RESILIENCE_AVAILABLE = True
+except ImportError:
+    RESILIENCE_AVAILABLE = False
+    CircuitBreakerError = Exception
+
+logger = logging.getLogger(__name__)
 
 # Try to load .env file relative to this script's directory
 # But don't fail if it doesn't exist (e.g., on Render where env vars are set in dashboard)
@@ -82,6 +105,11 @@ class AEOSClient:
 
 
     def authenticate(self):
+        """
+        Authenticate with AEOS API and obtain a token.
+
+        Includes retry logic for transient failures.
+        """
         url = f"{BASE_URL}/auth/login"
         payload = {
             "authparams": self.api_key,
@@ -89,14 +117,34 @@ class AEOSClient:
             "app": "apiv4"
         }
 
-        r = self.session.post(url, json=payload, timeout=15)
-        r.raise_for_status()
+        # Retry authentication up to 3 times with exponential backoff
+        max_attempts = 3
+        last_error = None
 
-        data = r.json()
-        self.token = data["token"]
-        # Token expires in 600 seconds (10 minutes), refresh 30 seconds early for safety
-        self.token_expires_at = datetime.now() + timedelta(seconds=570)
-        return self.token
+        for attempt in range(max_attempts):
+            try:
+                r = self.session.post(url, json=payload, timeout=15)
+                r.raise_for_status()
+
+                data = r.json()
+                self.token = data["token"]
+                # Token expires in 600 seconds (10 minutes), refresh 30 seconds early for safety
+                self.token_expires_at = datetime.now() + timedelta(seconds=570)
+                logger.debug(f"AEOS authentication successful (attempt {attempt + 1})")
+                return self.token
+
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout,
+                    requests.exceptions.HTTPError) as e:
+                last_error = e
+                delay = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning(f"AEOS auth attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                if attempt < max_attempts - 1:
+                    import time
+                    time.sleep(delay)
+
+        logger.error(f"AEOS authentication failed after {max_attempts} attempts")
+        raise last_error
 
     # Internal helper for headers
     def _headers(self):
@@ -111,10 +159,16 @@ class AEOSClient:
     def post_helper(self, method: str, payload: dict, timeout: float | None = 30):
         """
         Call /APIv4/helper/{method} with JSON payload.
-        Automatically retries on 401 errors after re-authentication.
+
+        Includes:
+        - Automatic retry on 401 errors after re-authentication
+        - Retry with exponential backoff on transient failures
+        - Circuit breaker pattern (if available)
         """
         url = f"{BASE_URL}/APIv4/helper/{method}"
-        max_retries = 2
+        max_retries = 3
+        last_error = None
+
         for attempt in range(max_retries):
             try:
                 r = self.session.post(
@@ -123,57 +177,112 @@ class AEOSClient:
                     headers=self._headers(),
                     timeout=timeout,
                 )
-                # If 401, re-authenticate and retry once
+                # If 401, re-authenticate and retry
                 if r.status_code == 401 and attempt < max_retries - 1:
-                    print("  ⟳ Token expired, re-authenticating...")
+                    logger.warning(f"Token expired on {method}, re-authenticating...")
                     self.token = None
                     self.token_expires_at = None
                     continue
+
                 r.raise_for_status()
                 return r.json()
+
             except requests.exceptions.HTTPError as e:
                 if e.response and e.response.status_code == 401 and attempt < max_retries - 1:
-                    print("  ⟳ Token expired, re-authenticating...")
+                    logger.warning(f"Token expired on {method}, re-authenticating...")
                     self.token = None
                     self.token_expires_at = None
                     continue
+                last_error = e
+                # Don't retry on 4xx client errors (except 401)
+                if e.response and 400 <= e.response.status_code < 500:
+                    raise
+
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout) as e:
+                last_error = e
+                delay = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning(f"AEOS {method} attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(delay)
+                    continue
+
+            except Exception as e:
+                last_error = e
+                logger.error(f"AEOS {method} unexpected error: {e}")
                 raise
+
+        logger.error(f"AEOS {method} failed after {max_retries} attempts")
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"AEOS {method} failed")
 
     def post_report(self, method: str, payload: dict, timeout: float | None = 30):
         """
         Call /APIv4/report/{method} with JSON payload.
-        Automatically retries on 401 errors after re-authentication.
+
+        Includes:
+        - Automatic retry on 401 errors after re-authentication
+        - Retry with exponential backoff on transient failures
         """
         url = f"{BASE_URL}/APIv4/report/{method}"
-        max_retries = 2
+        max_retries = 3
+        last_error = None
+
         for attempt in range(max_retries):
             try:
-                # Debug: print the payload
+                # Debug: print the payload for deep analysis
                 if method == "initiateDeepAnalysisAdvertisingReport":
                     import json
-                    print(f"[DEBUG] Sending to {method}:")
-                    print(json.dumps(payload, indent=2, default=str))
+                    logger.debug(f"Sending to {method}: {json.dumps(payload, indent=2, default=str)}")
+
                 r = self.session.post(
                     url,
                     json=payload,
                     headers=self._headers(),
                     timeout=timeout,
                 )
-                # If 401, re-authenticate and retry once
+                # If 401, re-authenticate and retry
                 if r.status_code == 401 and attempt < max_retries - 1:
-                    print("  ⟳ Token expired, re-authenticating...")
+                    logger.warning(f"Token expired on {method}, re-authenticating...")
                     self.token = None
                     self.token_expires_at = None
                     continue
+
                 r.raise_for_status()
                 return r.json()
+
             except requests.exceptions.HTTPError as e:
                 if e.response and e.response.status_code == 401 and attempt < max_retries - 1:
-                    print("  ⟳ Token expired, re-authenticating...")
+                    logger.warning(f"Token expired on {method}, re-authenticating...")
                     self.token = None
                     self.token_expires_at = None
                     continue
+                last_error = e
+                # Don't retry on 4xx client errors (except 401)
+                if e.response and 400 <= e.response.status_code < 500:
+                    raise
+
+            except (requests.exceptions.ConnectionError,
+                    requests.exceptions.Timeout) as e:
+                last_error = e
+                delay = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning(f"AEOS {method} attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(delay)
+                    continue
+
+            except Exception as e:
+                last_error = e
+                logger.error(f"AEOS {method} unexpected error: {e}")
                 raise
+
+        logger.error(f"AEOS {method} failed after {max_retries} attempts")
+        if last_error:
+            raise last_error
+        raise RuntimeError(f"AEOS {method} failed")
 
   
     def get_channels(self, analytics: bool):

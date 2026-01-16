@@ -1,8 +1,10 @@
 """
-Job Executor - Executes data collection jobs in background.
+Job Executor - Executes data collection jobs in background with retry logic.
 
-Updates progress in database instead of SSE streaming.
-Stores final result in database on completion.
+Features:
+- Retry logic with exponential backoff (max 3 retries)
+- Progress updates persisted to database
+- Graceful error handling and recovery
 """
 
 import asyncio
@@ -16,6 +18,8 @@ from supabase_client import (
     complete_job as db_complete_job,
     get_pending_jobs,
     get_running_jobs_count,
+    increment_job_retry,
+    get_job_by_id as db_get_job_by_id,
 )
 from .job_manager import job_manager
 
@@ -25,47 +29,53 @@ logger = logging.getLogger(__name__)
 # Maximum rows to collect to prevent memory exhaustion
 MAX_ROWS = 50000
 
+# Retry configuration
+MAX_RETRIES = 3
+RETRY_BASE_DELAY = 2  # seconds (exponential: 2s, 4s, 8s)
+
 
 async def update_progress(job_id: str, progress: int, message: str, stage: str = "info"):
     """Update job progress in database."""
-    await asyncio.get_event_loop().run_in_executor(
-        None,
-        lambda: update_job_status(
-            job_id,
-            status="running",
-            progress=progress,
-            progress_message=message
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: update_job_status(
+                job_id,
+                status="running",
+                progress=progress,
+                progress_message=message
+            )
         )
-    )
+    except Exception as e:
+        logger.warning(f"Job {job_id} - Failed to update progress: {e}")
 
 
-async def execute_job(job_id: str, parameters: Dict[str, Any]):
+async def execute_job_with_retry(job_id: str, parameters: Dict[str, Any], retry_count: int = 0):
     """
-    Execute a data collection job.
-
-    This function runs the same data collection logic as stream_progress_updates
-    but updates the database instead of yielding SSE events.
+    Execute a data collection job with retry logic.
 
     Args:
         job_id: The job UUID
         parameters: Job parameters including company_name, dates, filters, etc.
+        retry_count: Current retry attempt (0-indexed)
     """
+    loop = asyncio.get_event_loop()
+
     try:
-        # Mark job as running
-        loop = asyncio.get_event_loop()
+        # Mark job as running with retry info
         await loop.run_in_executor(
             None,
             lambda: update_job_status(
                 job_id,
                 status="running",
                 progress=0,
-                progress_message="Starting data collection...",
+                progress_message=f"Starting data collection{f' (retry {retry_count})' if retry_count > 0 else ''}...",
                 started_at=datetime.utcnow()
             )
         )
 
         await update_progress(job_id, 0, "Initializing AEOS client...", "info")
-        logger.info(f"Job {job_id} - Initializing")
+        logger.info(f"Job {job_id} - Initializing (attempt {retry_count + 1}/{MAX_RETRIES})")
 
         # Import AEOS components
         try:
@@ -79,6 +89,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
             logger.error(f"Job {job_id} - AEOS import failed: {e}")
 
         if not AEOS_AVAILABLE:
+            # Don't retry for import errors - they won't resolve
             await loop.run_in_executor(
                 None,
                 lambda: update_job_status(
@@ -100,16 +111,8 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
             logger.debug(f"Job {job_id} - AEOS client created")
         except Exception as e:
             logger.error(f"Job {job_id} - AEOS client error: {e}")
-            await loop.run_in_executor(
-                None,
-                lambda: update_job_status(
-                    job_id,
-                    status="failed",
-                    error_message=f"Error initializing AEOS: {str(e)}",
-                    completed_at=datetime.utcnow()
-                )
-            )
-            return
+            # Retry on connection errors
+            raise RetryableError(f"Error initializing AEOS: {str(e)}")
 
         # Extract parameters
         company_name = parameters.get("company_name", "")
@@ -127,7 +130,10 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         await update_progress(job_id, 10, "Fetching channels...", "info")
 
         # Get channels
-        all_channels_raw = await loop.run_in_executor(None, client.get_analytics_channels)
+        try:
+            all_channels_raw = await loop.run_in_executor(None, client.get_analytics_channels)
+        except Exception as e:
+            raise RetryableError(f"Failed to fetch channels: {str(e)}")
 
         # Filter channels if specified
         if channel_filter and channel_filter.strip():
@@ -149,6 +155,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         channels_with_data = 0
         row_limit_reached = False
         target = company_name.lower() if company_name else ""
+        consecutive_errors = 0
 
         for idx, ch in enumerate(all_channels):
             channel_id = ch["value"]
@@ -175,6 +182,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
                     ),
                     timeout=300.0  # 5 minute timeout per channel
                 )
+                consecutive_errors = 0  # Reset on success
 
                 # Flatten report data using the same utility as main streaming
                 rows = flatten_spotlist_report(report)
@@ -189,7 +197,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
                     if len(all_rows) >= MAX_ROWS:
                         row_limit_reached = True
                         break
-                    
+
                     r["Channel"] = channel_caption
 
                     if target:
@@ -203,7 +211,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
 
                 if channel_matches > 0:
                     channels_with_data += 1
-                
+
                 # If row limit reached, stop processing more channels
                 if row_limit_reached:
                     await update_progress(
@@ -215,6 +223,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
                     break
 
             except asyncio.TimeoutError:
+                consecutive_errors += 1
                 await update_progress(
                     job_id,
                     int(progress),
@@ -222,12 +231,17 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
                     "warning"
                 )
             except Exception as e:
+                consecutive_errors += 1
                 await update_progress(
                     job_id,
                     int(progress),
                     f"Error on {channel_caption}: {str(e)[:50]}",
                     "warning"
                 )
+
+            # If too many consecutive errors, something is wrong - retry the job
+            if consecutive_errors >= 5:
+                raise RetryableError(f"Too many consecutive channel errors ({consecutive_errors})")
 
         await update_progress(job_id, 70, f"Found {len(all_rows)} spots from {channels_with_data} channels", "success")
 
@@ -254,6 +268,7 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
             "report_type": report_type,
             "total_spots": len(all_rows),
             "channels_with_data": channels_with_data,
+            "retry_count": retry_count,
         }
 
         await update_progress(job_id, 95, "Saving results...", "info")
@@ -265,21 +280,15 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         )
 
         if success:
-            logger.info(f"Job {job_id} completed with {len(all_rows)} spots")
+            logger.info(f"Job {job_id} completed with {len(all_rows)} spots (attempt {retry_count + 1})")
         else:
-            logger.error(f"Job {job_id} - Failed to save results to database")
-            await loop.run_in_executor(
-                None,
-                lambda: update_job_status(
-                    job_id,
-                    status="failed",
-                    error_message="Failed to save results to database",
-                    completed_at=datetime.utcnow()
-                )
-            )
+            raise RetryableError("Failed to save results to database")
+
+    except RetryableError as e:
+        logger.warning(f"Job {job_id} - Retryable error: {e}")
+        await handle_retry(job_id, parameters, retry_count, str(e))
 
     except asyncio.CancelledError:
-        loop = asyncio.get_event_loop()
         await loop.run_in_executor(
             None,
             lambda: update_job_status(
@@ -292,26 +301,72 @@ async def execute_job(job_id: str, parameters: Dict[str, Any]):
         raise
 
     except Exception as e:
-        import traceback
-        logger.error(f"Job {job_id} - Exception occurred: {e}")
+        logger.error(f"Job {job_id} - Unexpected exception: {e}")
         logger.exception("Full traceback:")
-
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: update_job_status(
-                job_id,
-                status="failed",
-                error_message=str(e)[:500],
-                completed_at=datetime.utcnow()
-            )
-        )
+        # Unexpected errors may be retryable
+        await handle_retry(job_id, parameters, retry_count, str(e)[:500])
 
     finally:
         logger.debug(f"Job {job_id} - Cleaning up")
         await job_manager.unregister_job(job_id)
         # Try to start next queued job
         await process_queued_jobs()
+
+
+class RetryableError(Exception):
+    """Error that indicates the job should be retried."""
+    pass
+
+
+async def handle_retry(job_id: str, parameters: Dict[str, Any], current_retry: int, error_message: str):
+    """Handle retry logic with exponential backoff."""
+    loop = asyncio.get_event_loop()
+
+    if current_retry < MAX_RETRIES - 1:
+        next_retry = current_retry + 1
+        delay = RETRY_BASE_DELAY * (2 ** current_retry)  # Exponential: 2s, 4s, 8s
+
+        logger.info(f"Job {job_id} - Scheduling retry {next_retry + 1}/{MAX_RETRIES} in {delay}s")
+
+        # Update job status to pending_retry
+        await loop.run_in_executor(
+            None,
+            lambda: update_job_status(
+                job_id,
+                status="pending_retry",
+                progress_message=f"Retrying in {delay}s... (attempt {next_retry + 1}/{MAX_RETRIES})",
+                error_message=error_message
+            )
+        )
+
+        # Increment retry count in database
+        await loop.run_in_executor(
+            None,
+            lambda: increment_job_retry(job_id)
+        )
+
+        # Wait before retrying
+        await asyncio.sleep(delay)
+
+        # Retry the job
+        await execute_job_with_retry(job_id, parameters, next_retry)
+    else:
+        logger.error(f"Job {job_id} - Max retries ({MAX_RETRIES}) exceeded")
+        await loop.run_in_executor(
+            None,
+            lambda: update_job_status(
+                job_id,
+                status="failed",
+                error_message=f"Max retries exceeded. Last error: {error_message}",
+                completed_at=datetime.utcnow()
+            )
+        )
+
+
+# Keep the old function name for backwards compatibility
+async def execute_job(job_id: str, parameters: Dict[str, Any]):
+    """Execute a data collection job (wrapper for retry-enabled version)."""
+    await execute_job_with_retry(job_id, parameters, retry_count=0)
 
 
 async def start_job(job_id: str, parameters: Dict[str, Any]) -> bool:

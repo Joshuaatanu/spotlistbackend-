@@ -81,6 +81,23 @@ except ImportError:
         raise
 
 
+# Background jobs availability flag
+JOBS_AVAILABLE = False
+try:
+    from services.jobs import job_manager, start_job
+    JOBS_AVAILABLE = True
+except ImportError:
+    print("Warning: Background jobs service not available.")
+
+# Competitor service availability flag
+COMPETITOR_SERVICE_AVAILABLE = False
+try:
+    from services.competitor_analyzer import CompetitorAnalyzer
+    COMPETITOR_SERVICE_AVAILABLE = True
+except ImportError:
+    print("Warning: Competitor analyzer service not available.")
+
+
 @lru_cache()
 def get_aeos_client():
     """
